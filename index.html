@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Chess Coach</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.js"></script>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#262522;--pn:#2f2d2a;--in:#22211f;--bt:#3f3c38;--ln:#3f3c38;--tx:#e8e6e3;--mu:#9d9a94;--ac:#81b64c;--onac:#10200a;--l:#eeeed2;--d:#769656;--hl:#f6f669;--pw:#ffffff;--pb:#1c1c1c;--pwo:#000;--pbo:#aaa;--ag:#5fae3d;--ar:#d9362f;--am:#a855f7}
+body{margin:0;background:var(--bg);color:var(--tx);font:13.5px/1.4 -apple-system,"Segoe UI",Roboto,system-ui,sans-serif}
+#app{display:flex;flex-wrap:wrap;gap:24px;justify-content:center;align-items:flex-start;padding:16px}
+#app[data-lay=right]{flex-direction:row;flex-wrap:nowrap}
+#app[data-lay=left]{flex-direction:row-reverse;flex-wrap:nowrap}
+#app[data-lay=below]{flex-direction:column;align-items:center;flex-wrap:nowrap}
+#app[data-lay=above]{flex-direction:column-reverse;align-items:center;flex-wrap:nowrap}
+#left,#panel{flex:none}
+#left{--s:min(90vw - 30px,70vh);width:calc(var(--s) + 26px)}
+#bw{display:flex;gap:6px}
+#ev{width:20px;background:var(--pb);border-radius:3px;overflow:hidden;display:flex;align-items:flex-end;height:var(--s)}
+#ev.f{transform:rotate(180deg)}
+#evw{width:100%;background:var(--pw);height:50%;transition:height .3s}
+#board{position:relative;display:grid;grid-template:repeat(8,1fr)/repeat(8,1fr);width:var(--s);height:var(--s);border-radius:3px;overflow:hidden}
+.sq{position:relative;display:flex;align-items:center;justify-content:center;user-select:none}
+.sq.l{background-color:var(--l)}.sq.d{background-color:var(--d)}
+.sq.last{background-image:linear-gradient(color-mix(in srgb,var(--hl) 55%,transparent),color-mix(in srgb,var(--hl) 55%,transparent))}
+.sq.sel{background-image:linear-gradient(rgba(20,85,30,.45),rgba(20,85,30,.45))}
+.sq.incheck{background-image:radial-gradient(#f33,#c00 40%,transparent 75%)}
+.sq.mv::after{content:"";position:absolute;width:30%;height:30%;border-radius:50%;background:rgba(0,0,0,.2)}
+.sq.cap::after{content:"";position:absolute;inset:0;border:calc(var(--s)/60) solid rgba(0,0,0,.22);border-radius:50%}
+.p{font-size:calc(var(--s)/8*.82*var(--ps,1));line-height:1;cursor:grab;z-index:2}
+.p.w{color:var(--pw);text-shadow:0 0 3px var(--pwo),0 0 3px var(--pwo),0 0 2px var(--pwo)}
+.p.b{color:var(--pb);text-shadow:0 0 1px var(--pbo),0 0 2px var(--pbo)}
+.sq i{position:absolute;font:700 calc(var(--s)/58) system-ui;font-style:normal;opacity:.9}
+.sq i.r{top:2px;left:3px}.sq i.f{bottom:1px;right:3px}
+.sq.l i{color:var(--d)}.sq.d i{color:var(--l)}
+#board.nc i{display:none}
+#arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.bar{display:flex;align-items:center;gap:10px;margin:6px 0 6px 26px;height:30px}
+.bar .nm{flex:1;font-weight:600}.bar .mt{color:var(--mu);font-size:12px}
+.bar .ck{font:600 17px ui-monospace,Consolas,monospace;background:var(--in);color:var(--mu);padding:3px 10px;border-radius:4px;min-width:74px;text-align:center}
+.bar.on .ck{background:var(--tx);color:var(--bg)}
+#stat{margin:8px 0 0 26px;color:var(--mu)}
+#panel{width:360px;max-width:100%;background:var(--pn);border-radius:8px;padding:0 14px 14px}
+.top{display:flex;align-items:baseline;justify-content:space-between;padding:14px 0 6px}
+h2{margin:0;font-size:17px;font-weight:700}.by{font-size:11px;color:var(--mu);margin-top:2px}#eng{font-size:11.5px;color:var(--mu);text-align:right}
+#tabs{display:flex;border-bottom:1px solid var(--ln);margin:0 -14px 14px;padding:0 4px;overflow:hidden}
+@media(max-width:380px){#tabs button{font-size:11px;padding:9px 2px}}
+#tabs button{background:none;border-radius:0;color:var(--mu);padding:9px 4px;flex:1;font-size:12.5px;white-space:nowrap}
+#tabs button.on{color:var(--tx);box-shadow:inset 0 -2px var(--ac)}
+section{display:flex;flex-direction:column;gap:10px}section[hidden]{display:none}
+.g2{display:grid;grid-template-columns:138px 1fr;gap:9px 10px;align-items:center}
+.g2>label{color:var(--mu)}.g2>label b{color:var(--tx);font-weight:600;margin-left:4px}
+.chk{grid-column:1/-1;display:flex;align-items:center;gap:8px;color:var(--tx)}
+.inl{display:flex;gap:5px;align-items:center;white-space:nowrap}
+select,input[type=number],input[type=text]{background:var(--in);color:var(--tx);border:1px solid var(--ln);border-radius:5px;padding:5px 7px;font:inherit;min-width:0}
+input[type=number]{width:48px}input[type=text]{flex:1}input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;margin:0;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(to right,var(--ac) var(--p,50%),var(--bt) var(--p,50%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border-radius:50%;background:var(--tx);border:0;box-shadow:0 0 0 2px var(--pn),0 1px 3px rgba(0,0,0,.5)}
+input[type=range]:hover::-webkit-slider-thumb{filter:brightness(1.15)}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--bt)}
+input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--ac)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--tx);border:0;box-shadow:0 0 0 2px var(--pn)}
+input[type=range]:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:4px}
+*{scrollbar-width:thin;scrollbar-color:var(--bt) transparent}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--bt);border-radius:4px}::-webkit-scrollbar-track{background:transparent}input[type=checkbox]{accent-color:var(--ac)}
+button{background:var(--bt);color:var(--tx);border:0;border-radius:5px;padding:7px 11px;font:inherit;cursor:pointer}
+button:hover{filter:brightness(1.18)}button.pri{background:var(--ac);color:var(--onac);font-weight:700}
+.btns{display:flex;gap:6px;flex-wrap:wrap}.btns3{display:grid;grid-template-columns:repeat(3,1fr)}.btns3 button{padding:7px 4px}
+#moves:empty{display:none}
+.ln{padding:4px 9px;border-radius:4px;display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px}
+.ln.g{background:color-mix(in srgb,var(--ag) 26%,transparent)}.ln.r{background:color-mix(in srgb,var(--ar) 24%,transparent)}.ln.m{background:color-mix(in srgb,var(--am) 30%,transparent)}
+#moves{max-height:150px;overflow:auto;background:var(--in);padding:7px 9px;border-radius:5px;line-height:1.7;color:var(--mu)}#moves b{color:var(--tx);font-weight:500}
+#editor{display:none;flex-direction:column;gap:8px;border:1px solid var(--ln);padding:9px;border-radius:6px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pb{font-size:23px;padding:1px 8px;line-height:1.25}.pb.w{background:#8a8782;color:var(--pw);text-shadow:0 0 2px var(--pwo)}.pb.b{background:#ccc;color:var(--pb)}.pb.on{outline:2px solid var(--ac)}
+small{color:var(--mu)}
+input[type=color]{width:100%;height:26px;padding:2px;background:var(--in);border:1px solid var(--ln);border-radius:5px;cursor:pointer}
+summary{cursor:pointer}
+textarea{background:var(--in);color:var(--tx);border:1px solid var(--ln);border-radius:5px;padding:7px;font:12px ui-monospace,Consolas,monospace;width:100%;resize:vertical}
+body{touch-action:manipulation;-webkit-text-size-adjust:100%}
+@media(max-width:560px){#app{padding:8px;gap:12px}.bar{margin-left:20px}#stat{margin-left:20px}.g2{grid-template-columns:104px 1fr}}
+</style></head><body>
+<div id="app">
+<div id="left">
+ <div class="bar" id="bt"><span class="nm"></span><span class="mt"></span><span class="ck"></span></div>
+ <div id="bw"><div id="ev"><div id="evw"></div></div><div id="board"><svg id="arrows" viewBox="0 0 8 8"></svg></div></div>
+ <div class="bar" id="bb"><span class="nm"></span><span class="mt"></span><span class="ck"></span></div>
+ <div id="stat"></div>
+</div>
+<div id="panel">
+ <div class="top"><div><h2>Chess Coach</h2><div class="by">made by rtls_a1 on discord</div></div><span id="eng">Loading Stockfish…</span></div>
+ <nav id="tabs"><button data-t="game" class="on">Game</button><button data-t="coach">Coach</button><button data-t="bot">Bot</button><button data-t="board">Board</button><button data-t="layout">Layout</button><button data-t="screen">Screen</button><button data-t="presets">Presets</button></nav>
+
+ <section data-t="game">
+  <div class="g2">
+   <label>Mode</label><select id="mode"><option value="play">Play vs bot</option><option value="coach" selected>Coach</option><option value="analysis">Analysis</option><option value="auto">Bot vs bot</option></select>
+   <small id="modeD" style="grid-column:1/-1;margin-top:-3px"></small>
+   <label>I play</label><select id="me"><option value="w">White</option><option value="b">Black</option></select>
+   <label>Start position</label><select id="pos"><option value="">Standard</option><option value="rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1">Queen odds (bot has no queen)</option><option value="r1bqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1">Knight odds</option><option value="1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk - 0 1">Rook odds</option><option value="4k3/8/8/8/8/8/8/3QK3 w - - 0 1">King + queen vs king</option><option value="4k3/8/8/8/8/8/8/R3K3 w - - 0 1">King + rook vs king</option><option value="4k3/8/8/8/8/4P3/4K3/8 w - - 0 1">King + pawn vs king</option></select>
+   <label>Time control</label><select id="tc"><option value="">Custom</option><option value="1,0">1 min</option><option value="3,2">3 | 2</option><option value="5,0">5 min</option><option value="10,0">10 min</option><option value="15,10">15 | 10</option><option value="30,0">30 min</option></select>
+   <label>Clock</label><span class="inl"><input type="checkbox" id="timer"><input id="min" type="number" value="10" min="1"> min +<input id="incr" type="number" value="0" min="0"> s</span>
+  </div>
+  <div class="btns btns3"><button class="pri" id="new">New game</button><button id="pp" style="display:none">▶ Start</button><button id="undo">Undo</button><button id="flip">Flip</button><button id="resign">Resign</button><button id="edit">Edit position</button></div>
+  <div id="editor">
+   <div class="row" id="pal"></div>
+   <div class="row"><button id="clr">Clear</button><button id="std">Start position</button><span class="inl">Side to move <select id="side"><option value="w">White</option><option value="b">Black</option></select></span></div>
+   <div class="row"><button class="pri" id="done">Start from here</button><button id="cancel">Cancel</button></div>
+  </div>
+  <div id="lines"></div>
+  <div id="moves"></div>
+  <div class="inl"><input type="text" id="fen" placeholder="FEN or PGN"><button id="lf">Load</button><button id="cf">FEN</button><button id="pgnc">PGN</button></div>
+ </section>
+
+ <section data-t="coach" hidden>
+  <small>The coach gives you advice for your own moves: the green arrow, the red alternatives, and a purple arrow for a move that checkmates at once.</small>
+  <div class="g2">
+   <label class="chk"><input type="checkbox" id="hints" checked> Show arrows and best moves</label>
+   <label class="chk"><input type="checkbox" id="both"> Advise for both sides</label>
+   <label>Coach strength<b id="csV">20</b></label><input type="range" id="cskill" min="0" max="20" value="20">
+   <label>Think time<b id="ctV">1.0 s</b></label><input type="range" id="ctm" min="0.2" max="30" step="0.2" value="1">
+   <label>Max depth</label><select id="cdep"><option value="">Automatic</option><option>10</option><option>14</option><option>18</option><option>22</option><option>26</option></select>
+   <label>Arrows shown</label><select id="arrN"><option>1</option><option>2</option><option selected>3</option></select>
+   <label>Arrow width<b id="awV">16</b></label><input type="range" id="arrW" min="8" max="26" value="16">
+   <label>Engine memory</label><select id="hash"><option>16</option><option selected>32</option><option>64</option><option>128</option></select>
+  </div>
+  <small>Coach strength 20 is full strength. Lower it if you want advice closer to a human level. Engine memory is shared with the bot.</small>
+ </section>
+
+ <section data-t="bot" hidden>
+  <small>The bot is your opponent in “Play vs bot”, and both players in “Bot vs bot”.</small>
+  <div class="g2">
+   <label>Bot Elo<b id="eloV">1800</b></label><input type="range" id="elo" min="800" max="3200" step="50" value="1800">
+   <label>Black bot Elo<b id="el2V">1800</b></label><input type="range" id="elo2" min="800" max="3200" step="50" value="1800">
+   <label>Fastest move<b id="bnV">0.3 s</b></label><input type="range" id="bmin" min="0.1" max="10" step="0.1" value="0.3">
+   <label>Longest move<b id="bxV">3.0 s</b></label><input type="range" id="bmax" min="0.2" max="30" step="0.2" value="3">
+   <label class="chk"><input type="checkbox" id="early" checked> Move early when the choice is clear</label>
+   <label>Extra pause<b id="dlV">0.0 s</b></label><input type="range" id="delay" min="0" max="3" step="0.1" value="0">
+   <label>Max depth</label><select id="bdep"><option value="">Automatic</option><option>6</option><option>10</option><option>14</option><option>18</option></select>
+  </div>
+  <small>“Longest move” is only an upper limit. For each move the bot picks a time between fastest and longest, usually on the quick side, and with the box ticked it plays as soon as its choice is stable. A 10 second limit therefore does not mean 10 seconds per move. In Bot vs bot the first Elo plays White and “Black bot Elo” plays Black.</small>
+ </section>
+
+ <section data-t="board" hidden>
+  <div class="g2">
+   <label>Theme</label><select id="thm"><option value="classic">Classic green</option><option value="midnight">Midnight</option><option value="walnut">Walnut</option><option value="graphite">Graphite</option><option value="plum">Plum</option><option value="slate">Slate</option><option value="light">Light</option><option value="contrast">High contrast</option><option value="custom">Custom</option></select>
+   <details open style="grid-column:1/-1"><summary>Custom colors</summary><div class="g2" style="margin-top:9px">
+    <label>Background</label><input type="color" id="cBg" value="#262522">
+    <label>Panel</label><input type="color" id="cPn" value="#2f2d2a">
+    <label>Text</label><input type="color" id="cTx" value="#e8e6e3">
+    <label>Accent</label><input type="color" id="cAc" value="#81b64c">
+    <label>Light squares</label><input type="color" id="cL" value="#eeeed2">
+    <label>Dark squares</label><input type="color" id="cD" value="#769656">
+    <label>Move highlight</label><input type="color" id="cHl" value="#f6f669">
+    <label>White pieces</label><input type="color" id="cPw" value="#ffffff">
+    <label>Black pieces</label><input type="color" id="cPb" value="#1c1c1c">
+    <label>Best-move arrow</label><input type="color" id="cAg" value="#5fae3d">
+    <label>Alternative arrows</label><input type="color" id="cAr" value="#d9362f">
+    <label>Checkmate arrow</label><input type="color" id="cAm" value="#a855f7">
+   </div></details>
+   <label>Piece size<b id="pzV">100</b></label><input type="range" id="psz" min="70" max="105" value="100">
+   <label class="chk"><input type="checkbox" id="dots" checked> Legal-move dots</label>
+   <label class="chk"><input type="checkbox" id="coord" checked> Coordinates</label>
+   <label class="chk"><input type="checkbox" id="evt" checked> Evaluation bar</label>
+   <label class="chk"><input type="checkbox" id="mvt" checked> Move list</label>
+   <label class="chk"><input type="checkbox" id="autoq" checked> Auto-queen promotion</label>
+   <label class="chk"><input type="checkbox" id="snd"> Move sounds</label>
+  </div>
+ </section>
+
+ <section data-t="layout" hidden>
+  <div class="g2">
+   <label>Language</label><select id="lang"><option value="en">English</option><option value="de">Deutsch</option></select>
+   <label class="chk"><input type="checkbox" id="fit" checked> Auto-fit to this screen</label>
+   <label>Arrangement</label><select id="lay"><option value="auto">Auto (by screen shape)</option><option value="right">Panel on the right</option><option value="left">Panel on the left</option><option value="below">Panel below</option><option value="above">Panel above</option></select>
+   <label>Board size<b id="bzV">100</b>%</label><input type="range" id="bsz" min="40" max="150" value="100">
+   <label>Fixed board<b id="bpV">560</b>px</label><input type="range" id="bpx" min="240" max="1400" step="10" value="560">
+   <label>Panel width<b id="pwV">360</b>px</label><input type="range" id="pw" min="280" max="560" step="10" value="360">
+   <label>Interface scale<b id="uiV">100</b>%</label><input type="range" id="uis" min="70" max="160" step="5" value="100">
+   <label>Board left / right<b id="lxV">0</b></label><input type="range" id="lx" min="-400" max="400" step="5" value="0">
+   <label>Board up / down<b id="lyV">0</b></label><input type="range" id="ly" min="-400" max="400" step="5" value="0">
+   <label>Panel left / right<b id="rxV">0</b></label><input type="range" id="rx" min="-400" max="400" step="5" value="0">
+   <label>Panel up / down<b id="ryV">0</b></label><input type="range" id="ry" min="-400" max="400" step="5" value="0">
+  </div>
+  <div class="btns"><button id="rlay">Reset layout</button></div>
+  <small>With auto-fit on, the board is sized to your screen. Turn it off to use the fixed pixel size. On narrow screens the panel always moves below the board.</small>
+ </section>
+
+ <section data-t="screen" hidden>
+  <div class="btns"><button id="share">Share screen</button><button id="sload">Load screenshot</button><input type="file" id="sfile" accept="image/*" hidden></div>
+  <canvas id="pv" width="480" height="270" style="width:100%;display:none;border-radius:4px"></canvas>
+  <small id="sinfo">Click “Share screen” and pick the window or tab with the chess game. Everything else is automatic.</small>
+  <small id="sstat"></small>
+  <div class="g2">
+   <label class="chk"><input type="checkbox" id="live"> Watch live (always on)</label>
+   <label>Refresh<b id="ivV">1.0 s</b></label><input type="range" id="ivl" min="0.3" max="5" step="0.1" value="1">
+   <label>Board detection</label><select id="sdet"><option value="auto">Automatic</option><option value="manual">Manual (drag a square on the preview)</option></select>
+   <label>Orientation</label><select id="sori"><option value="auto">Automatic</option><option value="w">White at the bottom</option><option value="b">Black at the bottom</option></select>
+   <label>Ignore marks smaller than<b id="sminV">40</b>%</label><input type="range" id="smin" min="25" max="60" value="40">
+   <label>Move confirmation</label><select id="sconf"><option value="1">Instant (1 read)</option><option value="2" selected>Normal (2 reads)</option><option value="3">Careful (3 reads)</option></select>
+   <label>If the screen doesn’t match the game</label><select id="sres"><option value="auto">Re-sync automatically</option><option value="strict">Legal moves only (strict)</option></select>
+   <label class="chk"><input type="checkbox" id="sshow"> Show what I see on the preview</label>
+   <label class="chk"><input type="checkbox" id="sgrow" checked> Keep learning piece looks</label>
+  </div>
+  <div class="btns" id="snudge" style="display:none"><button data-n="-1,0,0" title="←">←</button><button data-n="1,0,0" title="→">→</button><button data-n="0,-1,0" title="↑">↑</button><button data-n="0,1,0" title="↓">↓</button><button data-n="0,0,-1" title="−">−</button><button data-n="0,0,1" title="+">+</button></div>
+  <div class="btns"><button id="slearn">Learn pieces from this position</button><button id="sforce">Set position from screen</button><button id="sreset">Reset learned pieces</button></div>
+  <small>Learning needs the starting position once per piece style. In the middle of a game, set the same position here (FEN or Edit position), then press “Learn pieces from this position”. On phones and tablets use “Load screenshot”: take a screenshot of your chess app and load it.</small>
+ </section>
+ <section data-t="presets" hidden>
+  <div class="btns"><button class="pri" id="reco">Recommended settings</button></div>
+  <small>Sets every setting to its recommended value: Coach mode, full-strength advice with 2 s of thinking, a balanced 2000 Elo bot, all three arrows, fast screen refresh and the standard look. Your side, start position and clock stay as they are.</small>
+  <div class="g2"><label>Name</label><input type="text" id="prName" placeholder="My preset"><label>Saved</label><select id="prList"></select></div>
+  <div class="btns"><button class="pri" id="prSave">Save current</button><button id="prLoad">Load</button><button id="prDel">Delete</button></div>
+  <small>To move a preset to a new tab or another device: copy the code, open the app there and paste it below. It is applied automatically.</small>
+  <textarea id="prCode" rows="4" placeholder="Paste a preset code here"></textarea>
+  <div class="btns"><button id="prCopy">Copy current settings as code</button><button id="prApply">Apply code</button></div>
+ </section>
+</div></div>
+<script>
+const $=s=>document.querySelector(s);
+const GL={k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+const URLS=['https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js','https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js'];
+const G={g:new Chess(),me:'w',mode:'coach',flip:false,sel:null,last:null,lines:[],run:false,over:false,msg:'',t:{w:0,b:0},inc:0,edit:false,tool:null,bak:null};
+let W=null,ready=false,busy=false,job=null,cur=null,sid=0,lastTick=Date.now();
+const send=m=>W&&W.postMessage(m);
+const sqN=(f,r)=>'abcdefgh'[f]+(r+1);
+const skill=t=>Math.round(Math.max(0,Math.min(20,(+$(G.mode=='auto'&&t=='b'?'#elo2':'#elo').value-800)/120)));
+const canMove=c=>!G.over&&!G.edit&&G.mode!='auto'&&(G.mode!='play'||c==G.me);
+
+/* ---------- board ---------- */
+function render(){
+ const b=$('#board'),g=G.g;b.querySelectorAll('.sq').forEach(e=>e.remove());
+ const tg={};if(G.sel&&$('#dots').checked)g.moves({square:G.sel,verbose:true}).forEach(m=>tg[m.to]=1);
+ for(let i=0;i<64;i++){
+  let f=i%8,r=7-(i>>3);if(G.flip){f=7-f;r=7-r}
+  const n=sqN(f,r),d=document.createElement('div'),pc=g.get(n);
+  d.className='sq '+((f+r)%2?'l':'d');
+  if(G.last&&G.last.includes(n))d.classList.add('last');
+  if(G.sel==n)d.classList.add('sel');
+  if(pc){
+   const p=document.createElement('span');p.className='p '+pc.color;p.textContent=GL[pc.type]+'\uFE0E';p.draggable=true;
+   p.ondragstart=e=>{if(!G.edit&&canMove(pc.color)&&pc.color==g.turn()){G.sel=n;e.dataTransfer.setData('text','x')}else e.preventDefault()};
+   d.appendChild(p);
+   if(pc.type=='k'&&pc.color==g.turn()&&g.in_check())d.classList.add('incheck');
+  }
+  if(tg[n])d.classList.add(pc?'cap':'mv');
+  if(i%8==0)d.insertAdjacentHTML('beforeend','<i class="r">'+(r+1)+'</i>');
+  if(i>55)d.insertAdjacentHTML('beforeend','<i class="f">'+'abcdefgh'[f]+'</i>');
+  d.onclick=()=>click(n);d.ondragover=e=>e.preventDefault();d.ondrop=e=>{e.preventDefault();click(n)};
+  b.insertBefore(d,$('#arrows'));
+ }
+ draw();
+}
+function click(n){
+ if(G.edit){if(!G.tool)return;G.g.remove(n);if(G.tool!='x')G.g.put({type:G.tool[1],color:G.tool[0]},n);return render()}
+ if(G.over)return;
+ const g=G.g,pc=g.get(n);
+ if(G.sel&&g.moves({square:G.sel,verbose:true}).some(m=>m.to==n))return doMove(G.sel,n);
+ G.sel=(pc&&pc.color==g.turn()&&canMove(pc.color))?n:null;render();
+}
+function doMove(from,to){
+ const mv=G.g.moves({square:from,verbose:true}).find(m=>m.to==to);let pr;
+ if(mv.promotion){pr='q';if(!$('#autoq').checked){pr=(prompt(T('Promote to (q, r, b, n):'),'q')||'q').toLowerCase();pr={d:'q',t:'r',l:'b',s:'n'}[pr]||pr;if(!'qrbn'.includes(pr))pr='q'}}
+ const r=G.g.move({from,to,promotion:pr});if(r)after(r);
+}
+function after(r){
+ beep(/[ce]/.test(r.flags));
+ G.last=[r.from,r.to];G.sel=null;G.lines=[];
+ if(G.run&&$('#timer').checked)G.t[r.color]+=G.inc*1000;
+ G.run=true;update();
+}
+function update(){
+ const g=G.g;
+ if(!G.over&&g.game_over()){G.over=true;G.run=false}
+ let m=G.msg?T(G.msg):'';
+ if(!G.msg){
+  if(g.in_checkmate())m=T('Checkmate – '+(g.turn()=='w'?'Black':'White')+' wins');
+  else if(g.in_stalemate())m=T('Stalemate – draw');
+  else if(g.in_draw())m=T('Draw');
+  else m=T((g.turn()=='w'?'White':'Black')+' to move')+(g.in_check()?' – '+T('check!'):'')+(G.mode=='coach'?' · '+T(g.turn()==G.me?'your move':'waiting for the opponent’s move'):'');
+ }
+ if(!G.msg&&!G.over&&G.mode=='auto'&&G.paused)m=T('Bot vs bot – press ▶ Start');
+ $('#stat').textContent=m;
+ const h=g.history();let s='';h.forEach((x,i)=>{s+=(i%2?'':'<b>'+(i/2+1)+'.</b> ')+dsan(x)+' '});
+ $('#moves').innerHTML=s;$('#moves').scrollTop=1e5;$('#fen').value=g.fen();
+ render();clocks();think();
+}
+
+/* ---------- engine ---------- */
+function think(){
+ if(G.over||G.edit){stopAll();G.lines=[];draw();return}
+ const t=G.g.turn(),fen=G.g.fen(),M=G.mode;
+ if(M=='auto'&&G.paused){stopAll();G.lines=[];draw();return}
+ if(M=='auto'||(M=='play'&&t!=G.me))return search({fen,multi:1,skill:skill(t),play:true});
+ if($('#hints').checked&&(M=='analysis'||t==G.me||$('#both').checked))return search({fen,multi:3,skill:+$('#cskill').value,play:false});
+ stopAll();G.lines=[];draw();
+}
+function stopAll(){job=null;sid++;if(busy)send('stop')}
+function search(o){o.id=++sid;job=o;if(busy)send('stop');else if(ready)startJob()}
+function startJob(){
+ if(!job)return;cur=job;job=null;busy=true;cur.lines=[];
+ send('setoption name Skill Level value '+cur.skill);
+ send('setoption name MultiPV value '+cur.multi);
+ send('position fen '+cur.fen);
+ send('setoption name Hash value '+$('#hash').value);const bp=cur.play,hi=+$(bp?'#bmax':'#ctm').value*1000,lo=bp?Math.min(+$('#bmin').value*1000,hi):hi,r=Math.random(),
+  mx=Math.round(bp?lo+(hi-lo)*r*r:hi),dp=$(bp?'#bdep':'#cdep').value;
+ cur.t0=Date.now();cur.stable=cur.t0;cur.last='';cur.mn=bp?Math.min(lo,mx):0;
+ send('go movetime '+mx+(dp?' depth '+dp:''));
+}
+function onMsg(e){
+ const s=typeof e.data=='string'?e.data:'';
+ if(s=='uciok')send('isready');
+ else if(s=='readyok'){ready=true;eng('Stockfish ready');startJob()}
+ else if(s.startsWith('info')&&cur&&s.includes(' pv ')&&!/bound/.test(s)){
+  const k=+((s.match(/multipv (\d+)/)||[])[1]||1),sc=s.match(/score (cp|mate) (-?\d+)/),pv=(s.match(/ pv (.+)$/)||[])[1];
+  if(!sc||!pv)return;
+  const sg=cur.fen.split(' ')[1]=='w'?1:-1;
+  cur.lines[k-1]={mv:pv.split(' ')[0],cp:sc[1]=='cp'?sg*sc[2]:null,mate:sc[1]=='mate'?sg*sc[2]:null};
+  if(k==1&&cur.play&&cur.lines[0].mv!=cur.last){cur.last=cur.lines[0].mv;cur.stable=Date.now()}
+  if(cur.id==sid&&!cur.play&&!G.over&&!G.edit&&cur.fen==G.g.fen()){G.lines=cur.lines;draw()}
+ }else if(s.startsWith('bestmove')){
+  busy=false;const c=cur;cur=null;
+  if(job)return startJob();
+  const bm=s.split(' ')[1];
+  if(c&&c.id==sid&&c.play&&bm&&bm!='(none)'){
+   setTimeout(()=>{if(c.id!=sid)return;const r=G.g.move({from:bm.slice(0,2),to:bm.slice(2,4),promotion:bm[4]});if(r)after(r)},+$('#delay').value*1000);
+  }
+ }
+}
+setInterval(()=>{
+ if(!cur||!cur.play||cur.stopped||!$('#early').checked)return;
+ const el=Date.now()-cur.t0;
+ if(el>=cur.mn&&Date.now()-cur.stable>=Math.max(300,.3*el)){cur.stopped=true;send('stop')}
+},120);
+async function boot(){
+ const errs=[];
+ for(const u of URLS)for(const how of ['fetch','import']){
+  try{
+   const src=how=='fetch'?await(await fetch(u)).text():"importScripts('"+u+"');";
+   const w=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
+   const ok=await new Promise(res=>{
+    const t=setTimeout(()=>{errs.push(how+': timeout');res(false)},10000);
+    w.onerror=e=>{clearTimeout(t);errs.push(how+': '+(e.message||'worker error'));res(false)};
+    w.onmessage=e=>{if(e.data=='uciok'){clearTimeout(t);res(true)}};
+    w.postMessage('uci');
+   });
+   if(ok){W=w;W.onerror=null;W.onmessage=onMsg;send('isready');return}
+   w.terminate();
+  }catch(e){errs.push(how+': '+e.message)}
+ }
+ location.protocol=='file:'?eng('Engine failed to load.','<br>'+errs.slice(0,2).join(' | ')):eng('⚠ This is the chat preview, which blocks the engine.','<br>'+T('Download the file, then double-click it in your Downloads folder to open it in Chrome or Firefox.'))
+}
+
+/* ---------- arrows & eval ---------- */
+const COL={get g(){return $('#cAg').value},get r(){return $('#cAr').value},get m(){return $('#cAm').value}};
+function san(mv){const t=new Chess(G.g.fen()),m=t.move({from:mv.slice(0,2),to:mv.slice(2,4),promotion:mv[4]});return m?m.san:mv}
+const fmt=l=>l.mate!=null?(l.mate<0?'-':'')+'M'+Math.abs(l.mate):(l.cp>=0?'+':'')+(l.cp/100).toFixed(2);
+function draw(){
+ const sv=$('#arrows'),L=G.edit||G.over||!$('#hints').checked?[]:G.lines.filter(Boolean).slice(0,+$('#arrN').value);
+ const pt=n=>{let f='abcdefgh'.indexOf(n[0]),r=+n[1]-1;if(G.flip){f=7-f;r=7-r}return[f+.5,7.5-r]};
+ let h='<defs>'+['g','r','m'].map(c=>`<marker id="m${c}" markerWidth="4" markerHeight="4" refX="0" refY="2" orient="auto"><path d="M0,0L4,2L0,4z" fill="${COL[c]}"/></marker>`).join('')+'</defs>';
+ const mt=new Chess(G.g.fen()),isM=l=>{try{const r=mt.move({from:l.mv.slice(0,2),to:l.mv.slice(2,4),promotion:l.mv[4]});if(!r)return false;const m=mt.in_checkmate();mt.undo();return m}catch(e){return false}};
+ [2,1,0].map(i=>[i,!!(G.lines[i]&&isM(G.lines[i]))]).sort((x,y)=>x[1]-y[1]).forEach(([i,cm])=>{
+  const l=G.lines[i];if(!l||!L.length||i>=+$('#arrN').value)return;
+  const c=cm?'m':i?'r':'g',a=pt(l.mv.slice(0,2)),b=pt(l.mv.slice(2,4)),dx=b[0]-a[0],dy=b[1]-a[1],d=Math.hypot(dx,dy);
+  h+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]-dx/d*.6}" y2="${b[1]-dy/d*.6}" stroke="${COL[c]}" stroke-width="${$('#arrW').value/100}" stroke-linecap="round" opacity=".85" marker-end="url(#m${c})"/>`;
+ });
+ sv.innerHTML=h;
+ $('#lines').innerHTML=L.map((l,i)=>{const m=isM(l);return`<div class="ln ${m?'m':i?'r':'g'}"><span>${T(m?'Checkmate':i?'Alternative':'Best')}: ${dsan(san(l.mv))}</span><span>${fmt(l)}</span></div>`}).join('');
+ const l0=G.lines[0];document.title=l0&&L.length?'♞ '+san(l0.mv)+' '+fmt(l0):'Chess Coach';
+ if(G.over){const m=G.msg||'',w=G.g.in_checkmate()?(G.g.turn()=='w'?0:100):/^White (resigned|lost)/.test(m)?0:/^Black (resigned|lost)/.test(m)?100:50;$('#evw').style.height=w+'%'}
+ else if(G.g.in_checkmate())$('#evw').style.height=(G.g.turn()=='w'?0:100)+'%';
+ else if(G.g.in_stalemate()||G.g.in_draw())$('#evw').style.height='50%';
+ else if(l0){const v=l0.mate!=null?(l0.mate>0?1e4:-1e4):l0.cp;$('#evw').style.height=(100/(1+Math.exp(-v/400)))+'%'}
+}
+
+/* ---------- clocks ---------- */
+const mmss=ms=>{const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const VAL={p:1,n:3,b:3,r:5,q:9};
+const MD={play:'You play one side, Stockfish plays the other.',coach:'You move both sides. The green arrow is your best move; enter the opponent’s moves yourself, or let Screen watch do it.',analysis:'Free board: best moves for whichever side is to move.',auto:'Two bots play each other. Press ▶ Start.'};
+function clocks(){
+ $('#modeD').textContent=T(MD[G.mode]||'');
+ $('#pp').style.display=G.mode=='auto'?'':'none';$('#pp').textContent=T(G.paused?'▶ Start':'⏸ Pause');
+ const bot=G.flip?'b':'w',top=bot=='w'?'b':'w',on=$('#timer').checked,sc={w:0,b:0};
+ G.g.board().flat().forEach(p=>{if(p&&p.type!='k')sc[p.color]+=VAL[p.type]});
+ const nm=c=>T(c=='w'?'White':'Black')+(G.mode=='play'?(c==G.me?T(' (you)'):' · Stockfish'):G.mode=='coach'?(c==G.me?T(' (you)'):''):G.mode=='auto'?' · Stockfish':'');
+ [['#bb',bot],['#bt',top]].forEach(([id,c])=>{
+  const e=$(id),d=sc[c]-sc[c=='w'?'b':'w'];
+  e.querySelector('.nm').textContent=nm(c);e.querySelector('.mt').textContent=d>0?'+'+d:'';
+  e.querySelector('.ck').textContent=on?mmss(G.t[c]):'--:--';
+  e.classList.toggle('on',on&&G.run&&!G.over&&G.g.turn()==c);
+ });
+}
+setInterval(()=>{
+ const n=Date.now(),dt=n-lastTick;lastTick=n;
+ if(!G.run||G.over||G.edit||!$('#timer').checked)return;
+ const c=G.g.turn();G.t[c]-=dt;
+ if(G.t[c]<=0){G.t[c]=0;G.over=true;G.run=false;G.msg=(c=='w'?'White':'Black')+' lost on time';stopAll();G.lines=[];$('#stat').textContent=T(G.msg);draw()}
+ clocks();
+},100);
+
+/* ---------- game control ---------- */
+function start(fen,std){
+ if(!fen&&!std)fen=$('#pos').value||null;
+ stopAll();const g=new Chess();if(fen&&!g.load(fen)){alert(T('Invalid position / FEN.'));return false}
+ G.g=g;G.me=$('#me').value;G.mode=$('#mode').value;G.paused=G.mode=='auto';G.flip=G.me=='b';$('#ev').classList.toggle('f',G.flip);
+ const m=Math.max(1,+$('#min').value||10)*60000;G.t={w:m,b:m};G.inc=+$('#incr').value||0;
+ G.run=false;G.over=false;G.msg='';G.sel=null;G.last=null;G.lines=[];G.edit=false;
+ $('#editor').style.display='none';update();return true;
+}
+$('#new').onclick=()=>start();
+$('#undo').onclick=()=>{
+ if(G.edit)return;stopAll();G.over=false;G.msg='';if(G.t.w<=0)G.t.w=30000;if(G.t.b<=0)G.t.b=30000;
+ if(G.g.undo()&&G.mode=='play'&&G.g.turn()!=G.me)G.g.undo();
+ const h=G.g.history({verbose:true}),l=h[h.length-1];G.last=l?[l.from,l.to]:null;G.sel=null;G.lines=[];update();
+};
+$('#flip').onclick=()=>{G.flip=!G.flip;$('#ev').classList.toggle('f',G.flip);render();clocks()};
+$('#dots').onchange=$('#hints').onchange=$('#both').onchange=()=>{G.sel=null;G.lines=[];update()};
+$('#timer').onchange=()=>clocks();
+$('#elo').oninput=e=>$('#eloV').textContent=e.target.value;
+$('#cf').onclick=()=>copyText(G.g.fen());
+$('#lf').onclick=()=>{
+ const t=$('#fen').value.trim(),g=new Chess();
+ if(/\[|^1\./.test(t)){if(!g.load_pgn(t))return alert(T('Invalid PGN.'));stopAll();G.g=g;G.over=false;G.msg='';G.sel=null;G.last=null;G.lines=[];update()}else start(t);
+};
+
+/* ---------- position editor ---------- */
+const pal=$('#pal');
+['wk','wq','wr','wb','wn','wp','bk','bq','br','bb','bn','bp','x'].forEach(c=>{
+ const b=document.createElement('button');b.className='pb '+c[0];b.textContent=c=='x'?'✕':GL[c[1]]+'\uFE0E';
+ b.onclick=()=>{G.tool=c;pal.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on')};pal.appendChild(b);
+});
+$('#edit').onclick=()=>{
+ if(G.edit)return;stopAll();G.bak=G.g;G.g=new Chess();G.g.load(G.bak.fen());
+ G.edit=true;G.sel=null;G.lines=[];$('#editor').style.display='flex';$('#side').value=G.g.turn();$('#stat').textContent=T('Editing: pick a piece, then click squares');render();
+};
+$('#clr').onclick=()=>{G.g.clear();render()};
+$('#std').onclick=()=>{G.g.reset();render()};
+$('#cancel').onclick=()=>{G.g=G.bak;G.edit=false;$('#editor').style.display='none';update()};
+$('#done').onclick=()=>{
+ const g=G.g,has=(s,t,c)=>{const p=g.get(s);return p&&p.type==t&&p.color==c};
+ const cs=(has('e1','k','w')&&has('h1','r','w')?'K':'')+(has('e1','k','w')&&has('a1','r','w')?'Q':'')+(has('e8','k','b')&&has('h8','r','b')?'k':'')+(has('e8','k','b')&&has('a8','r','b')?'q':'');
+ const bd=g.fen().split(' ')[0];
+ if(/^[^/]*[pP]|[pP][^/]*$/.test(bd)){alert(T('Pawns cannot stand on the first or last rank.'));return}
+ start(bd+' '+$('#side').value+' '+(cs||'-')+' - 0 1');
+};
+
+/* ---------- screen watch ---------- */
+const S={v:document.createElement('video'),img:null,src:'video',on:false,rect:null,tpl:null,fl:false,skip:0,pend:null,rawS:'',rawN:0,badN:0,sameN:0,unsure:false,ob:null,rd:null,guess:new Set(),ct:null};S.v.muted=true;S.v.playsInline=true;
+const fr=document.createElement('canvas'),fx=fr.getContext('2d',{willReadFrequently:true}),sm=document.createElement('canvas'),sx=sm.getContext('2d',{willReadFrequently:true}),pc=$('#pv');
+let F=null;
+const pl=g=>g.board().flat().map(p=>p?(p.color=='w'?p.type.toUpperCase():p.type):'.').join('');
+const SYM='.PNBRQKpnbrqk',SYI={};[...SYM].forEach((c,i)=>SYI[c]=i);
+let SK=['Click “Share screen” and pick the window or tab with the chess game. Everything else is automatic.'];
+const START=pl(new Chess()),say=(t,x)=>{SK=[t,x];$('#sinfo').textContent=T(t)+(x||'')};
+const MARGIN=4,KD=6,TS=140;
+/* learned piece looks are kept in this browser */
+const b64=a=>btoa(String.fromCharCode(...a)),unb=s=>Float32Array.from(atob(s),c=>c.charCodeAt(0)/255);
+function saveT(){try{const o={};for(const k in S.tpl)o[k]=S.tpl[k].slice(-10).map(t=>b64(Uint8Array.from(t,v=>Math.round(v*255))));localStorage.cc4=JSON.stringify({t:o,ct:S.ct})}catch(e){}}
+let svT=0;const saveSoon=()=>{clearTimeout(svT);svT=setTimeout(saveT,1500)};
+try{const j=JSON.parse(localStorage.cc4||'{}');if(j.t){S.tpl={};for(const k in j.t)S.tpl[k]=j.t[k].map(unb)}if(j.ct)S.ct=j.ct}catch(e){S.tpl=null}
+$('#live').checked=true;
+/* ---- one frame from the shared screen or from a loaded picture ---- */
+function grab(){
+ const el=S.src=='img'&&S.img?S.img:S.v,w=el.naturalWidth||el.videoWidth,h=el.naturalHeight||el.videoHeight;
+ if(!w||!h)return false;
+ const k=Math.min(1,2600/Math.max(w,h));fr.width=Math.round(w*k);fr.height=Math.round(h*k);fx.drawImage(el,0,0,fr.width,fr.height);
+ F={d:fx.getImageData(0,0,fr.width,fr.height).data,w:fr.width,h:fr.height};return true;
+}
+const px=(f,x,y)=>{x=x<0?0:x>=f.w?f.w-1:x;y=y<0?0:y>=f.h?f.h-1:y;return((y|0)*f.w+(x|0))*4};
+/* ---- board finder: an 8x8 checkerboard of two alternating flat colours ---- */
+function Lm(f,x,y,c,i,j){const o=px(f,x+(i+.12)*c,y+(j+.12)*c);return f.d[o]+f.d[o+1]+f.d[o+2]}
+function full(f,x,y,c){
+ if(x<0||y<0||x+8*c>f.w||y+8*c>f.h)return 0;
+ const col=[],par=[[[],[],[]],[[],[],[]]],med=a=>a.sort((p,q)=>p-q)[a.length>>1];
+ for(let j=0;j<8;j++)for(let i=0;i<8;i++){
+  const s=[[.12,.12],[.88,.12],[.12,.88],[.88,.88]].map(([u,v])=>{const o=px(f,x+(i+u)*c,y+(j+v)*c);return[f.d[o],f.d[o+1],f.d[o+2]]});
+  const m=[0,1,2].map(k=>s.map(q=>q[k]).sort((p,q)=>p-q)[1]);
+  col.push(m);[0,1,2].forEach(k=>par[(i+j)&1][k].push(m[k]));
+ }
+ const A=par[0].map(med),B=par[1].map(med);
+ if(Math.abs(A[0]+A[1]+A[2]-B[0]-B[1]-B[2])<45)return 0;
+ let ok=0,dev=0;
+ col.forEach((m,n)=>{const q=(((n>>3)+(n&7))&1)?B:A,d=Math.abs(m[0]-q[0])+Math.abs(m[1]-q[1])+Math.abs(m[2]-q[2]);if(d<45)ok++;dev+=Math.min(d,45)});
+ return ok>=46?ok*1000-dev:0;
+}
+function chk(f,x,y,c){
+ const a=Lm(f,x,y,c,1,1),b=Lm(f,x,y,c,2,1);let bad=0;
+ if(Math.abs(a-b)<45)return 0;
+ for(let j=1;j<5;j++)for(let i=1;i<5;i++)if(Math.abs(Lm(f,x,y,c,i,j)-(((i+j)&1)?b:a))>45&&++bad>3)return 0;
+ return full(f,x,y,c);
+}
+function edge(f,x,y,c){
+ /* sharpness of the 7+7 inner grid lines: strong step right at the line, flat on both sides */
+ const u=Math.max(1,Math.round(c/90)),Y=(a,b)=>{const o=px(f,a,b);return f.d[o]+f.d[o+1]+f.d[o+2]};
+ let t=0;
+ for(let k=1;k<8;k++)for(let j=0;j<8;j++){
+  const gx=x+k*c,gy=y+(j+.2)*c,hx=x+(j+.2)*c,hy=y+k*c;
+  t+=Math.abs(Y(gx-u,gy)-Y(gx+u,gy))-.5*(Math.abs(Y(gx-3*u,gy)-Y(gx-u,gy))+Math.abs(Y(gx+u,gy)-Y(gx+3*u,gy)));
+  t+=Math.abs(Y(hx,hy-u)-Y(hx,hy+u))-.5*(Math.abs(Y(hx,hy-3*u)-Y(hx,hy-u))+Math.abs(Y(hx,hy+u)-Y(hx,hy+3*u)));
+ }
+ return t;
+}
+function locate(){
+ if($('#sdet').value=='manual')return !!S.rect&&S.rect[2]>=60;
+ if(S.rect){const[x,y,s]=S.rect;if(full(F,x,y,s/8))return true}
+ const k=Math.min(1,720/Math.max(F.w,F.h));let g=F;
+ if(k<1){sm.width=Math.round(F.w*k);sm.height=Math.round(F.h*k);sx.drawImage(fr,0,0,sm.width,sm.height);g={d:sx.getImageData(0,0,sm.width,sm.height).data,w:sm.width,h:sm.height}}
+ let best=0,bx,by,bc;
+ for(let c=Math.max(8,Math.floor(22*k));c<=Math.min(g.w,g.h)/8;c++){const st=Math.max(2,c>>3);
+  for(let y=0;y+8*c<=g.h;y+=st)for(let x=0;x+8*c<=g.w;x+=st){const s=chk(g,x,y,c);if(s>best){best=s;bx=x;by=y;bc=c}}}
+ if(!best)return false;
+ const R=Math.ceil(2/k)+3,DC=Math.ceil(1/k)+1;let b2=-1,r=[bx/k,by/k,bc/k];
+ const tryAt=(X,Y,C)=>{if(!full(F,X,Y,C))return;const e=edge(F,X,Y,C);if(e>b2){b2=e;r=[X,Y,C]}};
+ for(let dc=-DC;dc<=DC;dc+=1)for(let dy=-R;dy<=R;dy+=2)for(let dx=-R;dx<=R;dx+=2)tryAt(bx/k+dx,by/k+dy,bc/k+dc);
+ let r0=r.slice();
+ for(let dc=-1;dc<=1;dc+=.5)for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)tryAt(r0[0]+dx,r0[1]+dy,r0[2]+dc);
+ r0=r.slice();
+ for(let dc=-.5;dc<=.5;dc+=.1)for(let dy=-1;dy<=1;dy+=.5)for(let dx=-1;dx<=1;dx+=.5)tryAt(r0[0]+dx,r0[1]+dy,r0[2]+dc);
+ S.rect=[r[0],r[1],r[2]*8];S.pend=null;return true;
+}
+/* ---- reading one square ----
+   A piece is found by its outline (strong colour steps), so it does not matter whether the piece is pale or dark,
+   or what colour the square or its highlight has. Move hints (dots, rings), highlights, hover frames and
+   coordinates are weak, small or hollow and do not count as pieces. */
+function obs(x0,y0,c){
+ const f=F,n=Math.max(16,Math.min(112,Math.round(c))),st=c/n,N=n*n,R=new Float32Array(N),G=new Float32Array(N),B=new Float32Array(N);
+ for(let j=0;j<n;j++){const ya=Math.round(y0+j*st),yb=Math.max(ya+1,Math.round(y0+(j+1)*st));
+  for(let i=0;i<n;i++){const xa=Math.round(x0+i*st),xb=Math.max(xa+1,Math.round(x0+(i+1)*st));let r=0,g=0,b=0,k=0;
+   for(let y=ya;y<yb;y++)for(let x=xa;x<xb;x++){const o=px(f,x,y);r+=f.d[o];g+=f.d[o+1];b+=f.d[o+2];k++}
+   const q=j*n+i;R[q]=r/k;G[q]=g/k;B[q]=b/k}}
+ /* the square's own colour: the most common colour just inside its border */
+ const hist=new Map();let bk=null,bn=0;
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++){
+  const m=Math.min(i,j,n-1-i,n-1-j)/n;if(m<.05||m>.15)continue;
+  const q=j*n+i,k=((R[q]|0)>>3)<<10|((G[q]|0)>>3)<<5|((B[q]|0)>>3);
+  let e=hist.get(k);if(!e){e=[0,0,0,0];hist.set(k,e)}e[0]++;e[1]+=R[q];e[2]+=G[q];e[3]+=B[q];if(e[0]>bn){bn=e[0];bk=e}
+ }
+ const br=bk[1]/bk[0],bg=bk[2]/bk[0],bb=bk[3]/bk[0];
+ const lo=Math.ceil(n*.07),hi=Math.floor(n*.93),sp=hi-lo;
+ const Sm=new Float32Array(N),E=new Uint8Array(N);
+ for(let q=0;q<N;q++)Sm[q]=R[q]+G[q]+B[q];
+ let wk=0,inn=0;
+ for(let j=lo;j<hi;j++)for(let i=lo;i<hi;i++){const q=j*n+i;inn++;if(Math.abs(R[q]-br)+Math.abs(G[q]-bg)+Math.abs(B[q]-bb)>45)wk++}
+ for(let j=lo+1;j<hi-1;j++)for(let i=lo+1;i<hi-1;i++){const q=j*n+i;if(Math.abs(Sm[q+1]-Sm[q-1])+Math.abs(Sm[q+n]-Sm[q-n])>110)E[q]=1}
+ /* close small gaps in the outline */
+ const D=new Uint8Array(N);
+ for(let j=lo;j<hi;j++)for(let i=lo;i<hi;i++){const q=j*n+i;if(!E[q])continue;for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++)D[q+dj*n+di]=1}
+ /* outline blobs: one blob = one piece; coordinates in the corners are tiny blobs of their own */
+ const lab=new Uint8Array(N),comps=[],stack=[],minA=Math.max(4,Math.round(.008*N));
+ for(let s=0;s<N;s++){
+  if(!D[s]||lab[s])continue;
+  let ax1=n,ay1=n,ax2=-1,ay2=-1,area=0,cen=0;const mem=[];lab[s]=1;stack.length=0;stack.push(s);
+  while(stack.length){
+   const q=stack.pop(),qi=q%n,qj=(q/n)|0;area++;mem.push(q);
+   if(qi<ax1)ax1=qi;if(qi>ax2)ax2=qi;if(qj<ay1)ay1=qj;if(qj>ay2)ay2=qj;
+   if(Math.abs(qi-n/2)<n*.2&&Math.abs(qj-n/2)<n*.2)cen++;
+   for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const ni=qi+di,nj=qj+dj;if(ni<lo||nj<lo||ni>=hi||nj>=hi)continue;const k=nj*n+ni;if(D[k]&&!lab[k]){lab[k]=1;stack.push(k)}}
+  }
+  const cw=ax2-ax1+1,ch=ay2-ay1+1;
+  /* a hollow frame that runs along all four sides of the square is a highlight, not a piece. A big smooth king or queen also has an empty middle and can reach the sides,
+     but its outline (shoulders, crown, cross) also lies well away from the border, which a frame never does */
+  if(ax1<=lo+1&&ay1<=lo+1&&ax2>=hi-2&&ay2>=hi-2&&cen<.02*N){
+   const bw=Math.max(3,Math.round(1.5*area/(2*(cw+ch)))+1);let mid=0;   /* border band = about 1.5 line widths */
+   for(const q of mem){const qi=q%n,qj=(q/n)|0;if(Math.min(qi-ax1,ax2-qi,qj-ay1,ay2-qj)>bw)mid++}
+   if(mid<.1*area)continue;
+  }
+  if(area<minA)continue;
+  comps.push({ax1,ay1,ax2,ay2,area,mem});
+ }
+ /* the biggest blob is the piece; parts that lie right next to it (crown balls, a knight's mane) belong to it */
+ const keep=new Uint8Array(N);let x1=n,y1=n,x2=-1,y2=-1,ar=0;
+ if(comps.length){
+  comps.sort((a,b)=>b.area-a.area);const m=comps[0],gap=Math.max(2,Math.round(n*.09)),use=[m];
+  for(let k=1;k<comps.length;k++){const q=comps[k],dx=Math.max(0,Math.max(m.ax1,q.ax1)-Math.min(m.ax2,q.ax2)),dy=Math.max(0,Math.max(m.ay1,q.ay1)-Math.min(m.ay2,q.ay2));if(Math.max(dx,dy)<=gap)use.push(q)}
+  for(const q of use){if(q.ax1<x1)x1=q.ax1;if(q.ax2>x2)x2=q.ax2;if(q.ay1<y1)y1=q.ay1;if(q.ay2>y2)y2=q.ay2;ar+=q.area;for(const i of q.mem)keep[i]=1}
+ }
+ /* colour of the piece: dark minus bright share of its middle (black pieces high, white low). Markings (arrows) are strongly coloured inside their shape, pieces are grey. */
+ let dk=0,bt=0,cnt=0,cs=0,cm=0;
+ if(ar){
+  const a=Math.round(n*.36),b=Math.round(n*.64),t=Math.round(n*.36),u=Math.round(n*.82);
+  for(let j=t;j<u;j++)for(let i=a;i<b;i++){const q=j*n+i,L=R[q]*.299+G[q]*.587+B[q]*.114;cnt++;if(L<97)dk++;else if(L>204)bt++}
+ }
+ /* shape: the outline filled in, and where the outline is dense */
+ const v=new Float32Array(512);
+ if(ar){
+  const out=new Uint8Array(N);stack.length=0;
+  const seed=(i,j)=>{const q=j*n+i;if(!keep[q]&&!out[q]){out[q]=1;stack.push(q)}};
+  for(let k=lo;k<hi;k++){seed(k,lo);seed(k,hi-1);seed(lo,k);seed(hi-1,k)}
+  while(stack.length){const q=stack.pop(),qi=q%n,qj=(q/n)|0;if(qi>lo)seed(qi-1,qj);if(qi<hi-1)seed(qi+1,qj);if(qj>lo)seed(qi,qj-1);if(qj<hi-1)seed(qi,qj+1)}
+  const cn=new Uint16Array(256),fs=new Float32Array(256),fe=new Float32Array(256);
+  for(let j=lo;j<hi;j++)for(let i=lo;i<hi;i++){
+   const q=j*n+i,ce=(((j-lo)*16/sp)|0)*16+(((i-lo)*16/sp)|0);cn[ce]++;
+   if(!out[q]){fs[ce]++;if(Math.abs(R[q]-br)+Math.abs(G[q]-bg)+Math.abs(B[q]-bb)>100){cm++;if(Math.max(R[q],G[q],B[q])-Math.min(R[q],G[q],B[q])>50)cs++}}
+   if(E[q]&&keep[q])fe[ce]++;
+  }
+  for(let k=0;k<256;k++){const q=Math.max(1,cn[k]);v[k]=fs[k]/q;v[256+k]=Math.min(1,2*fe[k]/q)}
+ }
+ return{v,bb:ar?Math.max(x2-x1+1,y2-y1+1)/n:0,dk:cnt?(dk-bt)/cnt:0,csh:cm?cs/cm:0,wk:wk/Math.max(1,inn),bg:[br,bg,bb],c:null};
+}
+function scan(){
+ const[x,y,s]=S.rect,c=s/8,out=[];
+ for(let i=0;i<64;i++){const o=obs(x+(i&7)*c,y+(i>>3)*c,c);o.p=par(i);out.push(o)}
+ return out;
+}
+function dist(v,t){let a=0,b=0,p=0,q=0;for(let i=0;i<256;i++){a+=Math.abs(v[i]-t[i]);b+=v[i]+t[i];p+=Math.abs(v[256+i]-t[256+i]);q+=v[256+i]+t[256+i]}return .4*a/(b+4)+.6*p/(q+4)}
+const par=i=>((i&7)+(i>>3))&1;
+const kcol=k=>k<1?0:k<7?1:-1,isW=s=>'PNBRQK'.includes(s),isB=s=>'pnbrqk'.includes(s);
+/* white pieces have little dark in their middle, black pieces a lot; the dividing line is learned from the start position */
+function colOf(o){const t=S.ct?S.ct[o.p]:.3;return o.dk<t-.07?1:o.dk>t+.07?-1:0}
+function cdist(v,k,p){
+ const T=S.tpl;if(!T)return 1;let m=9;
+ const run=(L,add)=>{if(L)for(const t of L){const d=dist(v,t)+add;if(d<m)m=d}};
+ run(T[SYM[k]+p],0);run(T[SYM[k]+(1-p)],.03);
+ return m>=9?1:m;
+}
+/* cost of explaining each square as empty or as each piece (lower = better).
+   What is on a square is judged from three things: is something big there, is it light or dark, and (when the
+   piece has been learned) which kind it is. A piece whose kind is not known yet still counts as a piece of its colour.
+   A big strongly coloured marking that is none of the learned pieces (an arrow) says nothing either way. */
+const UNK=KD*.46;
+function fillCosts(ob){
+ const mp=$('#smin').value/100;let sd=0,sn=0;
+ for(const o of ob){
+  const oc=Math.min(2,o.bb/mp),c=new Float32Array(13),d=new Float32Array(13);let m=9;
+  /* a coloured marking (arrow) lying over a piece tints it, so how light or dark it looks is no longer reliable: cu = 0 clean .. 1 covered */
+  o.cu=Math.max(0,Math.min(1,(o.csh-.1)/.2));
+  o.col=oc>=.45&&o.cu<.7?colOf(o):0;
+  for(let k=1;k<13;k++){d[k]=cdist(o.v,k,o.p)+(o.col&&kcol(k)!=o.col?.35*(1-o.cu):0);if(d[k]<m)m=d[k]}
+  o.m=m;o.d=d;o.occ=oc>=1;o.w=1;o.mk=false;
+  if(oc<.45){const cp=Math.max(0,1-oc)*8;for(let k=1;k<13;k++)c[k]=cp+KD}
+  else if(oc<1){const cp=(1-oc)*8+KD*.5;for(let k=1;k<13;k++)c[k]=cp+KD*d[k]}
+  else{
+   const w=Math.max(0,Math.min(1,(.30-m)/.12));o.w=w;o.mk=w<.5&&o.csh>.5;
+   if(o.mk){c[0]=UNK;for(let k=1;k<13;k++)c[k]=UNK}
+   else{
+    c[0]=Math.max(0,oc-.6)*8;
+    for(let k=1;k<13;k++)c[k]=w*KD*d[k]+(1-w)*(o.col?(kcol(k)==o.col?KD*.15:KD*1.45):KD*.55);
+   }
+   if(w>.3){sd+=m;sn++}
+  }
+  o.c=c;
+ }
+ return sn?sd/sn:0;
+}
+/* ---- rules-aware reading: which legal moves explain what the screen shows? ---- */
+const sqI=q=>(8-+q[1])*8+'abcdefgh'.indexOf(q[0]);
+function searchFrom(g,os){
+ const cb=os.map(o=>o.c),cur=pl(g);
+ const delta=p=>{let d=0;for(let i=0;i<64;i++)if(p[i]!==cur[i])d+=cb[i][SYI[p[i]]]-cb[i][SYI[cur[i]]];return d};
+ const bestK=cb.map(c=>Math.min(...c)),dcount=p=>{let n=0;for(let i=0;i<64;i++)if(cb[i][SYI[p[i]]]-bestK[i]>2.5)n++;return n};
+ const disOf=p=>{const s=new Set();for(let i=0;i<64;i++)if(cb[i][SYI[p[i]]]-bestK[i]>2.5)s.add(i);return s};
+ /* every square a move changes must be positively confirmed by the screen: a piece that is really there, or a square that is really empty */
+ const okAt=(i,X)=>{const o=os[i],c=cb[i],m=bestK[i];
+  if(X==='.')return !(o.occ&&!o.mk)||c[0]<=m+1.2;
+  if(!o.occ||o.mk)return false;
+  if(o.w>=.5)return c[SYI[X]]<=m+1.2;
+  return o.col?(o.col>0)==isW(X):o.cu>=.7};
+ const good=p=>{for(let i=0;i<64;i++)if(p[i]!==cur[i]&&!okAt(i,p[i]))return false;return true};
+ let stay=0;for(let i=0;i<64;i++)stay+=cb[i][SYI[cur[i]]];
+ let best={d:0,u:0,seq:[],stay,dis:0,kind:'none'};const undone=[];
+ for(let u=0;u<=2;u++){
+  if(u>0){const m=g.undo();if(!m)break;undone.push(m)}
+  const p=pl(g),dis=disOf(p);
+  if(u==0){best.dis=dis.size;if(!dis.size){best.kind='same';return best}}
+  if(dis.size>14)continue;
+  const al=new Set(dis);undone.forEach(m=>{al.add(sqI(m.from));al.add(sqI(m.to))});for(let i=0;i<64;i++)if(os[i].mk)al.add(i);
+  const maxD=u?2:3,pen=u?2.5:0;
+  const walk=(dep,seq,allowed)=>{
+   for(const m of g.moves({verbose:true})){
+    if(!allowed.has(sqI(m.from)))continue;
+    g.move(m);const pp=pl(g),d=delta(pp)+.8*(u+dep+1)+pen,sq=seq.concat([{from:m.from,to:m.to,promotion:m.promotion}]);
+    if(d<best.d&&good(pp))best={...best,d,u,seq:sq,rem:dcount(pp)};
+    if(dep+1<maxD&&dcount(pp)<=4*(maxD-dep-1)&&dcount(pp)>0){const a2=new Set(allowed);a2.add(sqI(m.to));walk(dep+1,sq,a2)}
+    g.undo();
+   }
+  };
+  walk(0,[],al);
+  if(u>0){const d=delta(p)+.8*u+pen;if(d<best.d&&good(p))best={...best,d,u,seq:[],rem:dcount(p)}}
+ }
+ for(let k=undone.length-1;k>=0;k--){const m=undone[k];g.move({from:m.from,to:m.to,promotion:m.promotion})}
+ /* a move that leaves nothing on the screen unexplained is accepted on weaker evidence (e.g. an arrow hides the square it came from and only the colour on the target changed) */
+ if(best.d<=-MARGIN||(best.seq.length&&best.u==0&&best.rem===0&&best.d<=-1.5))best.kind='move';
+ const dS=delta(START)+1.5;
+ if(cur!==START&&dS<=-MARGIN-2&&dS<best.d&&dcount(START)<=6){best={...best,d:dS,u:0,seq:[],kind:'start'}}
+ return best;
+}
+const swapTurn=fen=>{const a=fen.split(' ');a[1]=a[1]=='w'?'b':'w';a[3]='-';return a.join(' ')};
+function decode(ob){
+ const mk=fl=>Array.from({length:64},(_,b)=>ob[fl?63-b:b]);
+ const run=fl=>{const cb=mk(fl);let r=searchFrom(G.g,cb);r.fl=fl;r.cb=cb;
+  if(S.unsure&&r.kind!='move'){const alt=new Chess();if(alt.load(swapTurn(G.g.fen()))){const r2=searchFrom(alt,cb);if(r2.kind=='move'&&r2.d<r.d){r2.fl=fl;r2.cb=cb;r2.alt=alt;r=r2}}}
+  return r};
+ let res=run(S.fl);
+ if($('#sori').value=='auto'&&res.kind!='same'&&res.dis>5){
+  const o=run(!S.fl);
+  if(o.stay+o.d<res.stay+res.d-15){S.fl=!S.fl;side(!S.fl);res=o}
+ }
+ return res;
+}
+/* what the screen shows square by square: '.' empty, a piece letter, '+' / '-' a white / black piece of a kind not known yet,
+   '*' something that tells nothing (an arrow) */
+const rawOf=(ob,fl)=>Array.from({length:64},(_,b)=>{
+ const o=ob[fl?63-b:b],c=o.c;
+ if(o.mk||(o.occ&&o.cu>=.7))return '*';
+ if(o.occ&&o.w<.5)return o.col>0?'+':o.col<0?'-':'*';
+ let m=0;for(let k=1;k<13;k++)if(c[k]<c[m])m=k;return SYM[m]}).join('');
+const rawEq=(r,s)=>r==s||r=='*'||(r=='+'&&isW(s))||(r=='-'&&isB(s));
+/* the game and the screen agree on where every piece stands and what colour it has */
+function agreeOC(ob){
+ const cur=pl(G.g);
+ for(let b=0;b<64;b++){
+  const o=ob[S.fl?63-b:b],s=cur[b];
+  if(s=='.'){if(o.occ&&!o.mk)return false}
+  else if(!o.occ||o.mk||(o.cu<.7&&(!o.col||(o.col>0)!=isW(s))))return false;
+ }
+ return true;
+}
+/* pieces whose kind the screen did not show: keep the game's piece where it has one of that colour, otherwise take what is still missing
+   from the full set of pieces, preferring the piece that starts on that square */
+const FULL={P:8,N:2,B:2,R:2,Q:1,K:1};
+function complete(raw,cur,ob){
+ const p=raw.split(''),guess=new Set();
+ for(const white of[true,false])for(const k in FULL){   /* more of a kind than exist: the worst matches are not that kind after all */
+  const ch=white?k:k.toLowerCase(),ix=[];for(let i=0;i<64;i++)if(p[i]==ch)ix.push(i);
+  if(ix.length>FULL[k]){const dd=i=>{const o=ob[S.fl?63-i:i];return o&&o.d?o.d[SYI[ch]]:1};ix.sort((a,b)=>dd(a)-dd(b));for(const i of ix.slice(FULL[k]))p[i]=white?'+':'-'}
+ }
+ for(let i=0;i<64;i++){const r=p[i];if(r=='*')p[i]=cur[i];else if(r=='+'&&isW(cur[i]))p[i]=cur[i];else if(r=='-'&&isB(cur[i]))p[i]=cur[i]}
+ for(const[u,white]of[['+',true],['-',false]]){
+  const have={};for(const ch of p)if(ch!='.'&&(white?isW(ch):isB(ch))){const k=ch.toUpperCase();have[k]=(have[k]||0)+1}
+  const miss={};for(const k in FULL)miss[k]=Math.max(0,FULL[k]-(have[k]||0));
+  const un=[],pairs=[];for(let i=0;i<64;i++)if(p[i]==u)un.push(i);
+  for(const i of un){const o=ob[S.fl?63-i:i],pr=par(i);for(const k in FULL){const ch=white?k:k.toLowerCase(),known=S.tpl&&(S.tpl[ch+pr]||S.tpl[ch+(1-pr)]);pairs.push({i,ch,k,cost:(known&&o&&o.d?Math.min(o.d[SYI[ch]],.6):.35)+(START[i]==ch?0:.6)})}}
+  pairs.sort((a,b)=>a.cost-b.cost);
+  const done=new Set();
+  for(const e of pairs){if(done.has(e.i)||!miss[e.k])continue;done.add(e.i);miss[e.k]--;p[e.i]=e.ch;guess.add(e.i)}
+  for(const i of un)if(!done.has(i)){p[i]=white?'Q':'q';guess.add(i)}
+ }
+ return{p:p.join(''),guess};
+}
+function plausible(p){
+ const n=c=>p.split(c).length-1;
+ if(n('K')!=1||n('k')!=1||/[pP]/.test(p.slice(0,8)+p.slice(56)))return false;
+ for(const[P,Q,R,B,N]of[['P','Q','R','B','N'],['p','q','r','b','n']]){
+  if(n(P)>8)return false;
+  const ex=Math.max(0,n(Q)-1)+Math.max(0,n(R)-2)+Math.max(0,n(B)-2)+Math.max(0,n(N)-2);
+  if(ex>8-n(P)||n(P)+n(Q)+n(R)+n(B)+n(N)>15)return false;
+ }
+ return true;
+}
+/* could the screen still be the same game, a few moves later? (material can only go down, except by promotion) */
+function reachable(p){
+ const cur=pl(G.g),n=(s,c)=>s.split(c).length-1;
+ for(const set of ['PNBRQ','pnbrq']){
+  const[P,...O]=set;let extra=0;
+  if(n(p,P)>n(cur,P))return false;
+  for(const o of O)extra+=Math.max(0,n(p,o)-n(cur,o));
+  if(extra>n(cur,P)-n(p,P))return false;
+  let a=0,b=0;for(const c of set){a+=n(p,c);b+=n(cur,c)}
+  if(a>b)return false;
+ }
+ return true;
+}
+/* the square the last move started and ended on is tinted: the piece standing on the tinted square just moved, so the other side is to move */
+function turnHint(ob){
+ const med=a=>a.slice().sort((x,y)=>x-y)[a.length>>1],base=[0,1].map(pr=>[0,1,2].map(k=>med(ob.filter(o=>o.p==pr).map(o=>o.bg[k]))));
+ const T=[];ob.forEach((o,i)=>{const b=base[o.p];if(Math.abs(o.bg[0]-b[0])+Math.abs(o.bg[1]-b[1])+Math.abs(o.bg[2]-b[2])>45)T.push(i)});
+ if(T.length<1||T.length>3)return null;
+ const occ=T.filter(i=>ob[i].occ&&!ob[i].mk&&ob[i].col);if(occ.length!=1)return null;
+ return ob[occ[0]].col>0?'b':'w';
+}
+function forceLoad(p,guess){
+ const bd=[...Array(8)].map((_,r)=>p.slice(r*8,r*8+8).replace(/\.+/g,m=>m.length)).join('/');
+ const has=(s,c)=>p[(8-s[1])*8+'abcdefgh'.indexOf(s[0])]==c;
+ const cs=(has('e1','K')&&has('h1','R')?'K':'')+(has('e1','K')&&has('a1','R')?'Q':'')+(has('e8','k')&&has('h8','r')?'k':'')+(has('e8','k')&&has('a8','r')?'q':'');
+ const h=S.hint||G.me,ts=[h,h=='w'?'b':'w'],ok=[];
+ for(const t of ts){const x=new Chess(),o=new Chess(),opp=t=='w'?'b':'w';
+  if(x.load(bd+' '+t+' '+(cs||'-')+' - 0 1')&&o.load(bd+' '+opp+' - - 0 1')&&!o.in_check())ok.push(x)}
+ if(!ok.length)return false;
+ S.unsure=ok.length>1;S.guess=guess||new Set();G.g=ok[0];G.over=false;G.msg='';G.last=null;G.lines=[];G.sel=null;G.run=false;update();return true;
+}
+function applyRes(r){
+ const g=r.alt||G.g;if(r.alt)G.g=g;
+ G.over=false;G.msg='';
+ if(r.kind=='start'){S.guess=new Set();start(null,1);return}
+ for(let i=0;i<r.u;i++)g.undo();
+ let last=null;for(const m of r.seq){last=g.move(m);S.guess.delete(sqI(m.from));S.guess.delete(sqI(m.to))}
+ S.unsure=false;
+ if(last)after(last);
+ else{const h=g.history({verbose:true}),l=h[h.length-1];G.last=l?[l.from,l.to]:null;G.sel=null;G.lines=[];update()}
+}
+/* ---- learning what this site's pieces look like ---- */
+const avg=a=>a.reduce((s,x)=>s+x,0)/a.length;
+function calib(w,b,old){return[0,1].map(p=>{if(w[p].length>=2&&b[p].length>=2){const mw=avg(w[p]),mb=avg(b[p]);if(mb-mw>=.2)return(mw+mb)/2}return old?old[p]:.3})}
+function learn(ob,wb){
+ const a=wb?ob:ob.slice().reverse(),t={},w=[[],[]],b=[[],[]];
+ a.forEach((o,i)=>{if(START[i]!='.'){const k=START[i]+o.p;(t[k]=t[k]||[]).push(Float32Array.from(o.v));(isW(START[i])?w:b)[o.p].push(o.dk)}});
+ S.tpl=t;S.ct=calib(w,b,null);S.guess=new Set();S.fl=!wb;saveT();$('#mode').value='coach';$('#me').value=wb?'w':'b';start(null,1);say('Learned this board’s pieces automatically.');
+}
+/* While the game and the screen agree on where every piece is and what colour it has, the game tells what each piece is:
+   looks that are missing or were mistaken for another piece are learned from it. */
+function heal(ob){
+ if(!$('#sgrow').checked||!S.tpl||S.sameN<3||S.sameN%3)return;
+ const cur=pl(G.g),mp=$('#smin').value/100,cand=[];
+ for(let b=0;b<64;b++){
+  const sy=cur[b];if(sy=='.'||S.guess.has(b))continue;
+  const o=ob[S.fl?63-b:b];if(!o.occ||o.mk||o.bb<mp*1.15||o.csh>.25)continue;
+  const k=SYI[sy],key=sy+o.p,L=S.tpl[key]||[],dd=L.length?Math.min(...L.map(q=>dist(o.v,q))):9;
+  if(dd<=.08)continue;
+  let other=9;for(let q=1;q<13;q++)if(q!=k)other=Math.min(other,o.c[q]);
+  cand.push({o,key,dd,pri:(L.length?0:2)+(o.c[k]>other?1:0)});
+ }
+ cand.sort((a,b)=>b.pri-a.pri||b.dd-a.dd);
+ let added=0;
+ for(const e of cand){if(added>=3)break;const L=S.tpl[e.key]||(S.tpl[e.key]=[]);L.push(Float32Array.from(e.o.v));if(L.length>10)L.shift();added++}
+ if(added)saveSoon();
+}
+function side(w){setSide(w)}
+/* ---- one look at the screen ---- */
+function tick(){
+ if(!S.on||!grab())return;
+ if(S.skip>0){S.skip--;showPv();return}
+ analyze(false);
+}
+function analyze(force){
+ if(!locate()){S.rect=$('#sdet').value=='manual'?S.rect:null;S.skip=force?0:2;showPv();say($('#sdet').value=='manual'?'Drag a square around the board on the preview.':'Looking for a chessboard on the shared screen…');return false}
+ const ob=scan();S.ob=ob;
+ const mp=$('#smin').value/100;
+ if(!$('#live').checked&&!force||G.edit){showPv();return false}
+ if(['play','auto'].includes($('#mode').value)){$('#mode').value='coach';G.mode='coach'}
+ /* the starting position on the screen: 32 pieces on their squares, one side dark and the other light */
+ if(ob.every((o,i)=>(o.bb>=mp&&o.csh<=.5)==(i<16||i>=48))){
+  const t=avg(ob.slice(0,16).map(o=>o.dk)),b=avg(ob.slice(48).map(o=>o.dk)),th=(t+b)/2;
+  if(Math.abs(t-b)>=.2&&ob.slice(0,16).filter(o=>(o.dk>th)==(t>b)).length>=14&&ob.slice(48).filter(o=>(o.dk>th)==(b>t)).length>=14){
+   let again=!S.tpl||G.g.history().length>0||force;
+   if(!again){const q=fillCosts(ob);again=q>.3||ob.filter(o=>o.occ&&o.w<.5).length>=4}
+   if(again){const so=$('#sori').value;learn(ob,so=='auto'?b<t:so=='w');showPv();return true}
+  }
+ }
+ if(!S.tpl){showPv();say('Board found. I don’t know this piece style yet: show the starting position once, or set the same position here and press “Learn pieces from this position”.');return false}
+ fillCosts(ob);const conf=force?1:+$('#sconf').value;
+ const res=agreeOC(ob)?{kind:'same'}:decode(ob);S.rd=rawOf(ob,S.fl);
+ const cur0=pl(G.g);let dn=0;for(let i=0;i<64;i++)if(!rawEq(S.rd[i],cur0[i]))dn++;
+ $('#sstat').textContent=T('Pieces read')+': '+ob.filter(o=>o.occ&&!o.mk).length+' · '+T('Match')+' '+Math.round(100*(64-dn)/64)+'%';
+ showPv();
+ if(res.kind=='same'){S.pend=null;S.rawN=0;S.badN=0;S.sameN++;say('Watching the screen live.');heal(ob);return true}
+ S.sameN=0;
+ if((res.kind=='move'&&!(force&&res.rem>1))||res.kind=='start'){
+  S.rawN=0;S.badN=0;
+  const key=res.kind+'|'+res.u+'|'+res.seq.map(m=>m.from+m.to+(m.promotion||'')).join(',');
+  if(conf<=1||(S.pend&&S.pend.key==key&&++S.pend.n>=conf)){S.pend=null;applyRes(res);say('Watching the screen live.');return true}
+  if(!S.pend||S.pend.key!=key)S.pend={key,n:1};
+  quick();return false;
+ }
+ S.pend=null;
+ const raw=S.rd,cur=pl(G.g);let diff=0;for(let i=0;i<64;i++)if(!rawEq(raw[i],cur[i]))diff++;
+ const poor=ob.filter(o=>o.occ&&!o.mk&&!o.col&&o.w<.5).length,strict=$('#sres').value=='strict'&&G.g.history().length>0;
+ const rc=complete(raw,cur,ob),rp=rc.p;
+ if(diff>=(force?1:4)&&plausible(rp)&&(force||(poor==0&&!strict))){
+  if(rp==S.rawS)S.rawN++;else{S.rawS=rp;S.rawN=1;S.rawT=Date.now()}
+  const rch=reachable(rp),held=Date.now()-S.rawT;S.hint=turnHint(ob);
+  if(force||S.rawN>conf+(rch?0:6)&&held>=(rch?2500:6000)){S.rawN=0;if(forceLoad(rp,rc.guess)){say(force&&S.src=='img'?'Position loaded from the picture.':'Position loaded from the screen.');return true}}
+  else if(S.src=='video'&&S.rawN<4)quick();
+ }else{S.rawN=0;if(diff&&++S.badN>=8)say('The screen doesn’t match the game. If it stays like this, press “Set position from screen”.')}
+ if(force)say('That doesn’t look like a legal chess position yet: check that the whole board is visible and the pieces are recognised (see “Show what I see”).');
+ return false;
+}
+/* ---- preview, manual selection, buttons ---- */
+function showPv(){
+ if(!F)return;const x=pc.getContext('2d'),W=pc.width;pc.height=Math.round(W*F.h/F.w);x.drawImage(fr,0,0,W,pc.height);
+ if(!S.rect)return;const k=W/F.w,[a,b,s]=S.rect,c=s/8*k;
+ x.strokeStyle='#7fc24f';x.lineWidth=2;x.strokeRect(a*k,b*k,s*k,s*k);
+ if($('#sshow').checked&&S.ob){
+  x.textAlign='center';x.textBaseline='middle';x.font='bold '+Math.max(8,c*.55)+'px sans-serif';
+  S.ob.forEach((o,i)=>{const cx=a*k+(i&7)*c+c/2,cy=b*k+(i>>3)*c+c/2,sy=S.rd&&S.rd[S.fl?63-i:i];
+   if(o.occ&&!o.mk&&sy&&sy!='.'&&sy!='*'){const u=sy=='+'||sy=='-',ch=u?'?':sy,wh=u?sy=='+':sy==sy.toUpperCase();x.lineWidth=3;x.strokeStyle='#000';x.strokeText(ch,cx,cy);x.fillStyle=wh?'#fff':'#ffcc00';x.fillText(ch,cx,cy)}
+   else if(o.mk){x.lineWidth=3;x.strokeStyle='#000';x.strokeText('×',cx,cy);x.fillStyle='#ff9d2e';x.fillText('×',cx,cy)}
+   else if(o.wk>.02){x.fillStyle='rgba(255,60,60,.85)';x.beginPath();x.arc(cx,cy,Math.max(2,c*.07),0,7);x.fill()}});
+ }
+}
+const quick=()=>{if(tw)tw.postMessage(260);else setTimeout(tick,260)};
+let tw=null,ti=null;
+function runTicker(){
+ const ms=Math.round($('#ivl').value*1000);if(tw){tw.terminate();tw=null}clearInterval(ti);
+ try{tw=new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),'+ms+');onmessage=e=>setTimeout(()=>postMessage(0),e.data)'])));tw.onmessage=()=>tick()}catch(e){tw=null;ti=setInterval(tick,ms)}
+}
+$('#share').onclick=async()=>{
+ try{
+  const gd=o=>navigator.mediaDevices.getDisplayMedia(o);let st;
+  try{st=await gd({video:{cursor:'never'},audio:false})}catch(e){if(e.name=='NotAllowedError'||e.name=='AbortError')throw e;st=await gd({video:true,audio:false})}
+  S.src='video';S.v.srcObject=st;await S.v.play();S.on=true;S.rect=$('#sdet').value=='manual'?S.rect:null;S.pend=null;pc.style.display='block';shareLbl();
+  st.getVideoTracks()[0].onended=()=>{S.on=false;pc.style.display='none';shareLbl()};
+  say($('#sdet').value=='manual'?'Drag a square around the board on the preview.':'Looking for a chessboard on the shared screen…');
+ }catch(e){say('Screen sharing failed: ',e.message)}
+};
+function loadPic(f){
+ if(!f)return;const im=new Image();
+ im.onload=()=>{S.src='img';S.img=im;S.on=false;S.pend=null;if($('#sdet').value!='manual')S.rect=null;pc.style.display='block';shareLbl();if(!grab())return say('Screenshot could not be read.');analyze(true)};
+ im.onerror=()=>say('Screenshot could not be read.');im.src=URL.createObjectURL(f);
+}
+$('#sload').onclick=()=>$('#sfile').click();
+$('#sfile').onchange=e=>{loadPic(e.target.files&&e.target.files[0]);e.target.value=''};
+document.addEventListener('paste',e=>{const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(i=>i.type.startsWith('image/'));if(it&&$('#panel').contains(document.activeElement)===false)loadPic(it.getAsFile())});
+const reAnalyze=()=>{if(S.src=='img'&&S.img&&grab())analyze(true);else if(S.on)tick()};
+$('#slearn').onclick=()=>{
+ if(!F||!S.rect||!S.rd&&!locate())return say('First share the screen or load a screenshot so I can see the board.');
+ grab();const ob=scan(),truth=pl(G.g),mp=$('#smin').value/100,so=$('#sori').value;
+ let fl=so=='b'?true:so=='w'?false:S.fl;
+ if(so=='auto'){const m=f=>{let n=0;for(let b=0;b<64;b++)if((ob[f?63-b:b].bb>=mp)!=(truth[b]!='.'))n++;return n};fl=m(true)<m(false)}
+ let n=0;S.tpl=S.tpl||{};const cw=[[],[]],cb=[[],[]];
+ for(let b=0;b<64;b++)if(truth[b]!='.'){const o=ob[fl?63-b:b];if(o.bb>=mp*.9){const key=truth[b]+o.p,L=S.tpl[key]||(S.tpl[key]=[]);L.push(Float32Array.from(o.v));if(L.length>10)L.shift();(isW(truth[b])?cw:cb)[o.p].push(o.dk);n++}}
+ S.ct=calib(cw,cb,S.ct);S.guess=new Set();S.fl=fl;saveT();say('Learned the pieces from this position.',' ('+n+')');reAnalyze();
+};
+$('#sreset').onclick=()=>{S.tpl=null;S.ct=null;try{localStorage.removeItem('cc4');localStorage.removeItem('cc3')}catch(e){}say('Piece memory cleared. Show the starting position once, or learn from a known position.')};
+$('#sforce').onclick=()=>{
+ if(!F)return say('First share the screen or load a screenshot so I can see the board.');
+ if(!S.tpl)return say('Board found. I don’t know this piece style yet: show the starting position once, or set the same position here and press “Learn pieces from this position”.');
+ if(S.src=='img'||!S.on){if(S.src=='img'&&grab())analyze(true);return}
+ if(grab())analyze(true);
+};
+let nd=null;
+const nud=(dx,dy,ds)=>{if(!S.rect||!F)return;const u=Math.max(1,Math.round(F.w/900));S.rect=[S.rect[0]+dx*u,S.rect[1]+dy*u,Math.max(60,S.rect[2]+ds*u)];showPv();reAnalyze()};
+document.querySelectorAll('#snudge button').forEach(b=>b.onclick=()=>{const[dx,dy,ds]=b.dataset.n.split(',').map(Number);nud(dx,dy,ds)});
+const ppos=e=>{const r=pc.getBoundingClientRect(),k=F.w/r.width;return[(e.clientX-r.left)*k,(e.clientY-r.top)*k]};
+pc.style.touchAction='none';
+pc.addEventListener('pointerdown',e=>{if($('#sdet').value!='manual'||!F)return;nd=ppos(e);try{pc.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault()});
+pc.addEventListener('pointermove',e=>{if(!nd)return;const p=ppos(e),s=Math.max(Math.abs(p[0]-nd[0]),Math.abs(p[1]-nd[1]));S.rect=[p[0]<nd[0]?nd[0]-s:nd[0],p[1]<nd[1]?nd[1]-s:nd[1],s];showPv()});
+pc.addEventListener('pointerup',()=>{if(!nd)return;nd=null;if(S.rect&&S.rect[2]<60)S.rect=null;showPv();reAnalyze()});
+$('#sdet').addEventListener('change',()=>{const m=$('#sdet').value=='manual';$('#snudge').style.display=m?'flex':'none';if(!m)S.rect=null;else say('Drag a square around the board on the preview.');reAnalyze()});
+$('#sori').addEventListener('change',e=>{const o=$('#sori').value;if(o!='auto'){S.fl=o=='b';if(e.isTrusted)setSide(o=='w')}reAnalyze()});
+['smin','sconf','sshow'].forEach(i=>$('#'+i).addEventListener('input',()=>{S.pend=null;if(S.on||S.src=='img')showPv()}));
+$('#ivl').addEventListener('input',runTicker);
+function scrInit(){
+ S.fl=$('#sori').value=='b';$('#snudge').style.display=$('#sdet').value=='manual'?'flex':'none';runTicker();
+ if(!(navigator.mediaDevices&&navigator.mediaDevices.getDisplayMedia)){$('#share').disabled=true;SK=['Live screen sharing is not available in this browser (phones and tablets cannot share their screen). Use “Load screenshot” instead.']}
+}
+
+
+/* ---------- view, side switching, saved settings ---------- */
+function copyText(t,el){
+ const f=el||$('#fen'),old=f.value;f.value=t;f.select();let ok=false;
+ try{ok=document.execCommand('copy')}catch(e){}
+ const cm=T('Copied to the clipboard'),done=()=>{const o=$('#stat').textContent;$('#stat').textContent=cm;setTimeout(()=>{if($('#stat').textContent==cm)$('#stat').textContent=o},1200)};
+ if(ok)done();else if(navigator.clipboard)navigator.clipboard.writeText(t).then(done,()=>{});
+ if(!el)setTimeout(()=>{f.value=old},50);
+}
+function setSide(w){G.me=w?'w':'b';$('#me').value=G.me;G.flip=!w;$('#ev').classList.toggle('f',G.flip);G.sel=null;G.lines=[];stopAll();update()}
+function view(){
+ const b=$('#board');b.classList.toggle('nc',!$('#coord').checked);
+ b.style.setProperty('--ps',$('#psz').value/100);
+ $('#ev').style.display=$('#evt').checked?'':'none';$('#moves').style.display=$('#mvt').checked?'':'none';
+}
+const KEEP=[...document.querySelectorAll('#panel [id]')].filter(e=>/^(INPUT|SELECT)$/.test(e.tagName)&&!['fen','side','prName','prList','sfile'].includes(e.id));
+const saveP=()=>{try{localStorage.ccp=JSON.stringify(Object.fromEntries(KEEP.map(e=>[e.id,e.type=='checkbox'?e.checked:e.value])))}catch(e){}};
+$('#lang').value=(navigator.language||'').toLowerCase().startsWith('de')?'de':'en';
+try{const j=JSON.parse(localStorage.ccp||'{}');KEEP.forEach(e=>{if(e.id in j&&e.id!='mode'){if(e.type=='checkbox')e.checked=j[e.id];else e.value=j[e.id]}})}catch(e){}
+document.addEventListener('change',saveP);document.addEventListener('input',saveP);
+[['elo','eloV',v=>v],['ctm','ctV',v=>(+v).toFixed(1)+' s'],['bmin','bnV',v=>(+v).toFixed(1)+' s'],['bmax','bxV',v=>(+v).toFixed(1)+' s'],['elo2','el2V',v=>v],['delay','dlV',v=>(+v).toFixed(1)+' s'],['cskill','csV',v=>v],['arrW','awV',v=>v],['bsz','bzV',v=>v],['psz','pzV',v=>v],['bpx','bpV',v=>v],['pw','pwV',v=>v],['uis','uiV',v=>v],['lx','lxV',v=>v],['ly','lyV',v=>v],['rx','rxV',v=>v],['ry','ryV',v=>v],['ivl','ivV',v=>(+v).toFixed(1)+' s'],['smin','sminV',v=>v]].forEach(([i,o,f])=>{
+ const e=$('#'+i),u=()=>$('#'+o).textContent=f(e.value);e.addEventListener('input',u);u();
+});
+$('#mode').onchange=()=>{G.mode=$('#mode').value;G.paused=G.mode=='auto';G.sel=null;G.lines=[];stopAll();update()};
+$('#me').onchange=()=>setSide($('#me').value=='w');
+['coord','bsz','psz','evt','mvt'].forEach(i=>$('#'+i).addEventListener('input',view));
+$('#tc').onchange=e=>{const v=e.target.value;if(!v)return;const[m,i]=v.split(',');$('#min').value=m;$('#incr').value=i;$('#timer').checked=true;saveP()};
+$('#resign').onclick=()=>{if(G.over)return;G.over=true;G.run=false;G.msg=((G.mode=='play'?G.me:G.g.turn())=='w'?'White':'Black')+' resigned';stopAll();update()};
+$('#pp').onclick=()=>{G.paused=!G.paused;stopAll();update()};
+$('#pgnc').onclick=()=>copyText(G.g.pgn());
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x==b));
+ document.querySelectorAll('#panel section').forEach(s=>s.hidden=s.dataset.t!=b.dataset.t);
+});
+let AC=null;try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}
+function beep(cap){
+ if(!AC||!$('#snd').checked)return;try{AC.resume();const o=AC.createOscillator(),g=AC.createGain();o.type='triangle';o.frequency.value=cap?170:320;g.gain.value=.09;
+ o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+.09);o.stop(AC.currentTime+.1)}catch(e){}
+}
+/* ---------- responsive layout ---------- */
+function refit(){
+ const lay=$('#lay').value,Wd=innerWidth,Ht=innerHeight,ui=+$('#uis').value/100,pw=+$('#pw').value;
+ const side=((lay=='right'||lay=='left')&&Wd>=700)||(lay=='auto'&&Wd>=900);
+ let sz=$('#fit').checked?(side?Math.min(Wd-pw*ui-120,Ht-175):Math.min(Wd-60,Ht*.72))*$('#bsz').value/100:+$('#bpx').value;
+ sz=Math.max(180,Math.floor(sz));
+ $('#left').style.setProperty('--s',sz+'px');
+ $('#app').dataset.lay=side?(lay=='left'?'left':'right'):(lay=='above'?'above':'below');
+ const P=$('#panel'),pe=side?pw*ui:Math.min(Wd-24,Math.max(pw*ui,sz+26));
+ P.style.zoom=ui;P.style.width=(pe/ui)+'px';
+ $('#left').style.transform='translate('+$('#lx').value+'px,'+$('#ly').value+'px)';
+ P.style.transform='translate('+$('#rx').value+'px,'+$('#ry').value+'px)';
+}
+['fit','lay','bsz','bpx','pw','uis','lx','ly','rx','ry'].forEach(i=>$('#'+i).addEventListener('input',refit));
+addEventListener('resize',refit);addEventListener('orientationchange',refit);
+$('#rlay').onclick=()=>{
+ [['fit',true],['lay','auto'],['bsz',100],['bpx',560],['pw',360],['uis',100],['lx',0],['ly',0],['rx',0],['ry',0]].forEach(([i,v])=>{
+  const e=$('#'+i);if(e.type=='checkbox')e.checked=v;else e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));
+ });
+};
+/* ---------- presets: save, share as code, paste to apply ---------- */
+const snap=()=>Object.fromEntries(KEEP.map(e=>[e.id,e.type=='checkbox'?e.checked:e.value]));
+const enc=o=>'CC1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const dec=t=>{t=t.trim();if(t.startsWith('CC1:'))t=decodeURIComponent(escape(atob(t.slice(4))));return JSON.parse(t)};
+function applySnap(o){
+ KEEP.forEach(e=>{
+  if(!(e.id in o))return;const v=o[e.id];
+  if(e.type=='checkbox')e.checked=!!v;else{const old=e.value;e.value=v;if(e.tagName=='SELECT'&&e.value!=String(v))e.value=old}
+  e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+ view();refit();saveP();
+}
+const getPre=()=>{try{return JSON.parse(localStorage.ccpre||'{}')}catch(e){return{}}};
+function listPre(sel){
+ const p=getPre(),l=$('#prList');l.innerHTML='';
+ Object.keys(p).forEach(n=>l.add(new Option(n,n)));if(sel)l.value=sel;
+}
+function applyCode(){try{applySnap(dec($('#prCode').value));$('#prCode').value=''}catch(e){alert(T('That is not a valid preset code.'))}}
+$('#prSave').onclick=()=>{
+ const n=$('#prName').value.trim();if(!n)return alert(T('Give the preset a name first.'));
+ const p=getPre();p[n]=snap();try{localStorage.ccpre=JSON.stringify(p)}catch(e){return alert(T('Could not save here – use “Copy current settings as code” instead.'))}
+ listPre(n);
+};
+$('#prLoad').onclick=()=>{const p=getPre()[$('#prList').value];if(p)applySnap(p)};
+$('#prDel').onclick=()=>{const p=getPre(),n=$('#prList').value;if(!n)return;delete p[n];try{localStorage.ccpre=JSON.stringify(p)}catch(e){}listPre()};
+$('#prCopy').onclick=()=>{const c=enc(snap()),t=$('#prCode');t.value=c;t.select();copyText(c,t)};
+$('#prApply').onclick=applyCode;
+$('#prCode').addEventListener('paste',()=>setTimeout(()=>{if(/^\s*CC1:/.test($('#prCode').value))applyCode()},0));
+listPre();
+const fillR=e=>e.style.setProperty('--p',((e.value-e.min)/(e.max-e.min)*100)+'%');
+document.querySelectorAll('input[type=range]').forEach(fillR);
+document.addEventListener('input',e=>{if(e.target.type=='range')fillR(e.target)});
+const RECO={mode:'coach',elo:'2000',elo2:'2000',bmin:'0.3',bmax:'3',early:true,delay:'0',bdep:'',cskill:'20',ctm:'2',cdep:'',hash:'64',arrN:'3',arrW:'16',hints:true,both:false,thm:'classic',bsz:'100',psz:'100',dots:true,coord:true,evt:true,mvt:true,autoq:true,snd:false,fit:true,lay:'auto',bpx:'560',pw:'360',uis:'100',lx:'0',ly:'0',rx:'0',ry:'0',live:true,ivl:'0.5',sdet:'auto',sori:'auto',smin:'40',sconf:'2',sres:'auto',sshow:false,sgrow:true};
+$('#reco').onclick=()=>{if(confirm(T('Set every setting to the recommended values? Your side, start position and clock are not changed.')))applySnap(RECO)};
+/* ---------- themes ---------- */
+const CIDS=['cBg','cPn','cTx','cAc','cL','cD','cHl','cPw','cPb','cAg','cAr','cAm'];
+const TH=(a,b,c,d,e,f,g,h,i,j,k)=>Object.fromEntries(CIDS.map((id,n)=>[id,[a,b,c,d,e,f,g,h,i,j,k][n]]));
+const THEMES={
+ classic:TH('#262522','#2f2d2a','#e8e6e3','#81b64c','#eeeed2','#769656','#f6f669','#ffffff','#1c1c1c','#5fae3d','#d9362f'),
+ midnight:TH('#12151c','#1b2030','#e3e8f2','#4c8dff','#dee3e6','#8ca2ad','#f6f669','#ffffff','#1c1c1c','#3fb27f','#e5534b'),
+ walnut:TH('#27201c','#33292a','#efe6df','#d9a441','#f0d9b5','#b58863','#f6e27a','#ffffff','#1c1c1c','#8fbf5a','#d9503f'),
+ graphite:TH('#1d1d1d','#292929','#ececec','#9aa0a6','#e8e8e8','#9a9a9a','#f6f669','#ffffff','#1c1c1c','#6fbf73','#e0554b'),
+ plum:TH('#221b29','#2e2538','#eee6f4','#b07cf0','#ead9f0','#8b6aa5','#f6f669','#ffffff','#1c1c1c','#6cc08b','#e0557a'),
+ slate:TH('#1c2227','#262e35','#e4e9ed','#5fb3a1','#e6e1d6','#5d6b7a','#f2e46a','#ffffff','#1c1c1c','#5fb3a1','#d9604f'),
+ light:TH('#e9e8e4','#ffffff','#25241f','#5d8f3a','#eeeed2','#769656','#f6f669','#ffffff','#1c1c1c','#3f9a2e','#d9362f'),
+ contrast:TH('#000000','#101010','#ffffff','#ffd400','#ffffff','#4a4a4a','#ffd400','#ffffff','#000000','#00e676','#ff3b30')
+};
+const AM={classic:'#a855f7',midnight:'#b57bff',walnut:'#a855f7',graphite:'#b07cf0',plum:'#e879f9',slate:'#a78bfa',light:'#8b3dff',contrast:'#d000ff'};
+Object.keys(THEMES).forEach(k=>THEMES[k].cAm=AM[k]);
+const hx=c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16));
+const mix=(a,b,t)=>'#'+hx(a).map((v,i)=>Math.round(v+(hx(b)[i]-v)*t).toString(16).padStart(2,'0')).join('');
+const rl=c=>{const[r,g,b]=hx(c).map(v=>{v/=255;return v<=.03928?v/12.92:((v+.055)/1.055)**2.4});return .2126*r+.7152*g+.0722*b},ctr=(a,b)=>{const x=rl(a),y=rl(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+const lum=c=>{const[r,g,b]=hx(c);return(.299*r+.587*g+.114*b)/255};
+function applyTheme(){
+ const v=id=>$('#'+id).value,R=document.documentElement.style,set=(k,x)=>R.setProperty(k,x);
+ const bg=v('cBg'),pn=v('cPn'),tx=v('cTx'),ac=v('cAc');
+ set('--bg',bg);set('--pn',pn);set('--tx',tx);set('--ac',ac);
+ set('--mu',mix(tx,pn,.34));set('--ln',mix(pn,tx,.14));set('--in',mix(pn,bg,.55));set('--bt',mix(pn,tx,.16));
+ set('--onac',ctr(ac,'#10200a')>=ctr(ac,'#ffffff')?'#10200a':'#ffffff');
+ set('--l',v('cL'));set('--d',v('cD'));set('--hl',v('cHl'));
+ set('--pw',v('cPw'));set('--pb',v('cPb'));set('--pwo',lum(v('cPw'))>.5?'#000':'#fff');set('--pbo',lum(v('cPb'))>.5?'#000':'#aaa');
+ set('--ag',v('cAg'));set('--ar',v('cAr'));set('--am',v('cAm'));
+ draw();
+}
+$('#thm').addEventListener('change',()=>{const t=THEMES[$('#thm').value];if(t){CIDS.forEach(i=>$('#'+i).value=t[i]);applyTheme()}});
+CIDS.forEach(i=>$('#'+i).addEventListener('input',e=>{if(e.isTrusted)$('#thm').value='custom';applyTheme()}));
+/* ---------- language ---------- */
+const DE={"made by rtls_a1 on discord": "erstellt von rtls_a1 auf Discord", "Game": "Spiel", "Coach": "Coach", "Bot": "Bot", "Board": "Brett", "Layout": "Layout", "Screen": "Bildschirm", "Presets": "Vorlagen", "Mode": "Modus", "Play vs bot": "Gegen Bot spielen", "Analysis": "Analyse", "Bot vs bot": "Bot gegen Bot", "I play": "Ich spiele", "White": "Weiß", "Black": "Schwarz", "Start position": "Startstellung", "Standard": "Standard", "Queen odds (bot has no queen)": "Damenvorgabe (Bot ohne Dame)", "Knight odds": "Springervorgabe", "Rook odds": "Turmvorgabe", "King + queen vs king": "König + Dame gegen König", "King + rook vs king": "König + Turm gegen König", "King + pawn vs king": "König + Bauer gegen König", "Time control": "Zeitkontrolle", "Custom": "Benutzerdefiniert", "1 min": "1 Min.", "5 min": "5 Min.", "10 min": "10 Min.", "30 min": "30 Min.", "Clock": "Uhr", "min +": "Min. +", "New game": "Neue Partie", "Undo": "Zurück", "Flip": "Drehen", "Resign": "Aufgeben", "Edit position": "Stellung bearbeiten", "Clear": "Leeren", "Side to move": "Am Zug", "Start from here": "Hier starten", "Cancel": "Abbrechen", "Load": "Laden", "The coach gives you advice for your own moves: the green arrow, the red alternatives, and a purple arrow for a move that checkmates at once.": "Der Coach berät dich bei deinen eigenen Zügen: mit dem grünen Pfeil, den roten Alternativen und einem lila Pfeil für einen Zug, der sofort mattsetzt.", "Show arrows and best moves": "Pfeile und beste Züge anzeigen", "Advise for both sides": "Für beide Seiten beraten", "Coach strength": "Coach-Stärke", "Think time": "Denkzeit", "Max depth": "Max. Suchtiefe", "Automatic": "Automatisch", "Arrows shown": "Angezeigte Pfeile", "Arrow width": "Pfeilbreite", "Engine memory": "Engine-Speicher", "Coach strength 20 is full strength. Lower it if you want advice closer to a human level. Engine memory is shared with the bot.": "Coach-Stärke 20 ist volle Stärke. Senke sie, wenn die Tipps näher an menschlichem Niveau liegen sollen. Der Engine-Speicher wird mit dem Bot geteilt.", "The bot is your opponent in “Play vs bot”, and both players in “Bot vs bot”.": "Der Bot ist dein Gegner bei „Gegen Bot spielen“ und beide Spieler bei „Bot gegen Bot“.", "Bot Elo": "Bot-Elo", "Black bot Elo": "Elo des schwarzen Bots", "Fastest move": "Schnellster Zug", "Longest move": "Längster Zug", "Move early when the choice is clear": "Früh ziehen, wenn die Wahl klar ist", "Extra pause": "Zusätzliche Pause", "“Longest move” is only an upper limit. For each move the bot picks a time between fastest and longest, usually on the quick side, and with the box ticked it plays as soon as its choice is stable. A 10 second limit therefore does not mean 10 seconds per move. In Bot vs bot the first Elo plays White and “Black bot Elo” plays Black.": "„Längster Zug“ ist nur eine Obergrenze. Für jeden Zug wählt der Bot eine Zeit zwischen dem schnellsten und dem längsten Zug, meist eher kurz, und mit gesetztem Haken zieht er, sobald seine Wahl feststeht. Ein Limit von 10 Sekunden bedeutet also nicht 10 Sekunden pro Zug. Bei „Bot gegen Bot“ spielt die erste Elo Weiß und „Elo des schwarzen Bots“ Schwarz.", "Theme": "Design", "Classic green": "Klassisch grün", "Midnight": "Mitternacht", "Walnut": "Nussbaum", "Graphite": "Graphit", "Plum": "Pflaume", "Slate": "Schiefer", "Light": "Hell", "High contrast": "Hoher Kontrast", "Custom colors": "Eigene Farben", "Background": "Hintergrund", "Panel": "Bedienfeld", "Text": "Text", "Accent": "Akzent", "Light squares": "Helle Felder", "Dark squares": "Dunkle Felder", "Move highlight": "Zughervorhebung", "White pieces": "Weiße Figuren", "Black pieces": "Schwarze Figuren", "Best-move arrow": "Pfeil für den besten Zug", "Alternative arrows": "Pfeile für Alternativen", "Piece size": "Figurengröße", "Legal-move dots": "Punkte für legale Züge", "Coordinates": "Koordinaten", "Evaluation bar": "Bewertungsleiste", "Move list": "Zugliste", "Auto-queen promotion": "Automatisch zur Dame umwandeln", "Move sounds": "Zugtöne", "Language": "Sprache", "Auto-fit to this screen": "An diesen Bildschirm anpassen", "Arrangement": "Anordnung", "Auto (by screen shape)": "Automatisch (nach Bildschirmform)", "Panel on the right": "Bedienfeld rechts", "Panel on the left": "Bedienfeld links", "Panel below": "Bedienfeld unten", "Panel above": "Bedienfeld oben", "Board size": "Brettgröße", "Fixed board": "Festes Brett", "Panel width": "Breite des Bedienfelds", "Interface scale": "Oberflächengröße", "Board left / right": "Brett links / rechts", "Board up / down": "Brett hoch / runter", "Panel left / right": "Bedienfeld links / rechts", "Panel up / down": "Bedienfeld hoch / runter", "Reset layout": "Layout zurücksetzen", "With auto-fit on, the board is sized to your screen. Turn it off to use the fixed pixel size. On narrow screens the panel always moves below the board.": "Bei aktiver Anpassung wird das Brett an deinen Bildschirm angepasst. Schalte sie aus, um die feste Pixelgröße zu verwenden. Auf schmalen Bildschirmen steht das Bedienfeld immer unter dem Brett.", "Watch live (always on)": "Live beobachten (immer an)", "Refresh": "Aktualisierung", "Recommended settings": "Empfohlene Einstellungen", "Sets every setting to its recommended value: Coach mode, full-strength advice with 2 s of thinking, a balanced 2000 Elo bot, all three arrows, fast screen refresh and the standard look. Your side, start position and clock stay as they are.": "Setzt jede Einstellung auf den empfohlenen Wert: Coach-Modus, Tipps in voller Stärke mit 2 s Denkzeit, ein ausgewogener Bot mit 2000 Elo, alle drei Pfeile, schnelle Bildschirmaktualisierung und das Standard-Design. Deine Seite, die Startstellung und die Uhr bleiben unverändert.", "Name": "Name", "Saved": "Gespeichert", "Save current": "Aktuelle speichern", "Delete": "Löschen", "To move a preset to a new tab or another device: copy the code, open the app there and paste it below. It is applied automatically.": "Um eine Vorlage in einen neuen Tab oder auf ein anderes Gerät zu übertragen: Code kopieren, die App dort öffnen und hier unten einfügen. Er wird automatisch angewendet.", "Copy current settings as code": "Aktuelle Einstellungen als Code kopieren", "Apply code": "Code anwenden", "FEN or PGN": "FEN oder PGN", "My preset": "Meine Vorlage", "Paste a preset code here": "Vorlagen-Code hier einfügen", "Checkmate – White wins": "Schachmatt – Weiß gewinnt", "Checkmate – Black wins": "Schachmatt – Schwarz gewinnt", "Stalemate – draw": "Patt – Remis", "Draw": "Remis", "White to move": "Weiß ist am Zug", "Black to move": "Schwarz ist am Zug", "check!": "Schach!", "your move": "dein Zug", "waiting for the opponent’s move": "warte auf den Zug des Gegners", "Bot vs bot – press ▶ Start": "Bot gegen Bot – ▶ Start drücken", "White resigned": "Weiß hat aufgegeben", "Black resigned": "Schwarz hat aufgegeben", "White lost on time": "Weiß hat auf Zeit verloren", "Black lost on time": "Schwarz hat auf Zeit verloren", "You play one side, Stockfish plays the other.": "Du spielst eine Seite, Stockfish die andere.", "You move both sides. The green arrow is your best move; enter the opponent’s moves yourself, or let Screen watch do it.": "Du ziehst für beide Seiten. Der grüne Pfeil ist dein bester Zug; gib die Züge des Gegners selbst ein oder lass die Bildschirmbeobachtung das übernehmen.", "Free board: best moves for whichever side is to move.": "Freies Brett: beste Züge für die Seite, die gerade am Zug ist.", "Two bots play each other. Press ▶ Start.": "Zwei Bots spielen gegeneinander. Drücke ▶ Start.", " (you)": " (du)", "▶ Start": "▶ Start", "⏸ Pause": "⏸ Pause", "Best": "Bester Zug", "Alternative": "Alternative", "Stockfish ready": "Stockfish bereit", "Loading Stockfish…": "Stockfish wird geladen…", "Engine failed to load.": "Die Engine konnte nicht geladen werden.", "⚠ This is the chat preview, which blocks the engine.": "⚠ Das ist die Chat-Vorschau, sie blockiert die Engine.", "Download the file, then double-click it in your Downloads folder to open it in Chrome or Firefox.": "Lade die Datei herunter und öffne sie per Doppelklick im Download-Ordner in Chrome oder Firefox.", "Click “Share screen” and pick the window or tab with the chess game. Everything else is automatic.": "Klicke auf „Bildschirm teilen“ und wähle das Fenster oder den Tab mit dem Schachspiel. Alles Weitere läuft automatisch.", "Looking for a chessboard on the shared screen…": "Suche ein Schachbrett auf dem geteilten Bildschirm…", "Board found. Start a new game in that app so I can learn its pieces (once per piece style).": "Brett gefunden. Starte in dieser App eine neue Partie, damit ich die Figuren lernen kann (einmal pro Figurenstil).", "Watching the screen live.": "Der Bildschirm wird live beobachtet.", "Learned this board’s pieces automatically.": "Die Figuren dieses Bretts wurden automatisch gelernt.", "Screen sharing failed: ": "Bildschirmfreigabe fehlgeschlagen: ", "Share screen": "Bildschirm teilen", "Sharing ✓": "Wird geteilt ✓", "⚠ Syncing with the screen…": "⚠ Abgleich mit dem Bildschirm…", "Editing: pick a piece, then click squares": "Bearbeiten: Figur wählen, dann Felder anklicken", "Invalid position / FEN.": "Ungültige Stellung / FEN.", "Invalid PGN.": "Ungültiges PGN.", "Give the preset a name first.": "Gib der Vorlage zuerst einen Namen.", "Could not save here – use “Copy current settings as code” instead.": "Speichern ist hier nicht möglich – nutze stattdessen „Aktuelle Einstellungen als Code kopieren“.", "That is not a valid preset code.": "Das ist kein gültiger Vorlagen-Code.", "Set every setting to the recommended values? Your side, start position and clock are not changed.": "Alle Einstellungen auf die empfohlenen Werte setzen? Deine Seite, die Startstellung und die Uhr bleiben unverändert.", "Pawns cannot stand on the first or last rank.": "Bauern dürfen nicht auf der ersten oder letzten Reihe stehen.", "Promote to (q, r, b, n):": "Umwandeln in (d, t, l, s):", "Copied to the clipboard": "In die Zwischenablage kopiert", "Checkmate arrow": "Pfeil für Schachmatt", "Checkmate": "Schachmatt", "Load screenshot": "Screenshot laden", "Board detection": "Brett-Erkennung", "Manual (drag a square on the preview)": "Manuell (Quadrat in der Vorschau aufziehen)", "Orientation": "Ausrichtung", "White at the bottom": "Weiß unten", "Black at the bottom": "Schwarz unten", "Ignore marks smaller than": "Markierungen ignorieren, die kleiner sind als", "Move confirmation": "Zug-Bestätigung", "Instant (1 read)": "Sofort (1×)", "Normal (2 reads)": "Normal (2×)", "Careful (3 reads)": "Vorsichtig (3×)", "Show what I see on the preview": "Erkanntes in der Vorschau anzeigen", "Keep learning piece looks": "Aussehen der Figuren weiter dazulernen", "Learn pieces from this position": "Figuren von dieser Stellung lernen", "Set position from screen": "Stellung vom Bildschirm übernehmen", "Reset learned pieces": "Gelernte Figuren zurücksetzen", "Learning needs the starting position once per piece style. In the middle of a game, set the same position here (FEN or Edit position), then press “Learn pieces from this position”. On phones and tablets use “Load screenshot”: take a screenshot of your chess app and load it.": "Zum Lernen braucht die App die Grundstellung einmal pro Figurenstil. Mitten in einer Partie stellst du hier dieselbe Stellung ein (FEN oder Stellung bearbeiten) und drückst dann „Figuren von dieser Stellung lernen“. Auf Handys und Tablets nutzt du „Screenshot laden“: Mache einen Screenshot deiner Schach-App und lade ihn hoch.", "Drag a square around the board on the preview.": "Ziehe in der Vorschau ein Quadrat um das Brett.", "Board found. I don’t know this piece style yet: show the starting position once, or set the same position here and press “Learn pieces from this position”.": "Brett gefunden. Diesen Figurenstil kenne ich noch nicht: Zeige einmal die Grundstellung oder stelle hier dieselbe Stellung ein und drücke „Figuren von dieser Stellung lernen“.", "Pieces read": "Erkannte Figuren", "Match": "Übereinstimmung", "Position loaded from the picture.": "Stellung aus dem Bild übernommen.", "Position loaded from the screen.": "Stellung vom Bildschirm übernommen.", "The screen doesn’t match the game. If it stays like this, press “Set position from screen”.": "Der Bildschirm passt nicht zur Partie. Falls das so bleibt, drücke „Stellung vom Bildschirm übernehmen“.", "That doesn’t look like a legal chess position yet: check that the whole board is visible and the pieces are recognised (see “Show what I see”).": "Das ist noch keine gültige Schachstellung: Prüfe, ob das ganze Brett sichtbar ist und die Figuren erkannt werden (siehe „Erkanntes in der Vorschau anzeigen“).", "Screenshot could not be read.": "Der Screenshot konnte nicht gelesen werden.", "First share the screen or load a screenshot so I can see the board.": "Teile zuerst den Bildschirm oder lade einen Screenshot, damit ich das Brett sehen kann.", "Learned the pieces from this position.": "Die Figuren wurden von dieser Stellung gelernt.", "Piece memory cleared. Show the starting position once, or learn from a known position.": "Gelernte Figuren gelöscht. Zeige einmal die Grundstellung oder lerne von einer bekannten Stellung.", "Live screen sharing is not available in this browser (phones and tablets cannot share their screen). Use “Load screenshot” instead.": "Live-Bildschirmfreigabe ist in diesem Browser nicht verfügbar (Handys und Tablets können ihren Bildschirm nicht teilen). Nutze stattdessen „Screenshot laden“.", "If the screen doesn’t match the game": "Wenn der Bildschirm nicht zur Partie passt", "Re-sync automatically": "Automatisch abgleichen", "Legal moves only (strict)": "Nur legale Züge (streng)"};
+const T=s=>{if($('#lang').value!='de')return s;if(DE[s])return DE[s];if(/[A-Za-z]{3}/.test(s))(window.__miss=window.__miss||new Set()).add(s);return s};
+const dsan=x=>$('#lang').value=='de'?x.replace(/[QRBN]/g,m=>({Q:'D',R:'T',B:'L',N:'S'}[m])):x;
+let EK=['Loading Stockfish…'];const eng=(k,x)=>{EK=[k,x];$('#eng').innerHTML=T(k)+(x||'')};
+const shareLbl=()=>{$('#share').textContent=T(S.on?'Sharing ✓':'Share screen')};
+const TX=[];
+(function(){
+ const w=document.createTreeWalker($('#panel'),NodeFilter.SHOW_TEXT);let n;
+ while(n=w.nextNode()){if(n.nodeValue.trim()&&!n.parentElement.closest('#stat,#lines,#moves,#sinfo,#eng,#modeD,#pp,#share,#prList,textarea,b,.nm,.mt,.ck'))TX.push({n,o:n.nodeValue})}
+ document.querySelectorAll('#panel [placeholder]').forEach(e=>e.dataset.ph=e.placeholder);
+})();
+function applyLang(){
+ document.documentElement.lang=$('#lang').value;
+ TX.forEach(({n,o})=>{const m=o.match(/^(\s*)([\s\S]*?)(\s*)$/);n.nodeValue=m[1]+T(m[2])+m[3]});
+ document.querySelectorAll('#panel [data-ph]').forEach(e=>e.placeholder=T(e.dataset.ph));
+ say(...SK);eng(...EK);shareLbl();
+}
+$('#lang').addEventListener('change',()=>{applyLang();update()});
+applyTheme();scrInit();applyLang();
+view();refit();
+
+boot();start();
+</script></body></html>
